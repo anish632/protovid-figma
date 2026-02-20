@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProtoVid - Professional Prototype Video Exporter for Figma</title>
+  <meta name="description" content="Export your Figma prototypes as high-quality MP4 and GIF videos. Perfect for stakeholder presentations and documentation.">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #fff;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .cta-button {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #4a90e2;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+
+    .cta-button:hover {
+      background: #357abd;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 80px 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      font-size: 20px;
+      margin-bottom: 30px;
+      opacity: 0.9;
+    }
+
+    .hero .cta-button {
+      font-size: 18px;
+      padding: 16px 32px;
+    }
+
+    .features {
+      padding: 80px 0;
+    }
+
+    .features h2 {
+      text-align: center;
+      font-size: 36px;
+      margin-bottom: 50px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 40px;
+    }
+
+    .feature {
+      text-align: center;
+      padding: 30px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+
+    .feature h3 {
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+
+    .pricing {
+      padding: 80px 0;
+      background: #f8f9fa;
+    }
+
+    .pricing h2 {
+      text-align: center;
+      font-size: 36px;
+      margin-bottom: 50px;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .pricing-card.featured {
+      border: 3px solid #4a90e2;
+      transform: scale(1.05);
+    }
+
+    .pricing-card h3 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .price {
+      font-size: 48px;
+      font-weight: 700;
+      color: #4a90e2;
+      margin: 20px 0;
+    }
+
+    .price span {
+      font-size: 18px;
+      color: #6c757d;
+    }
+
+    .features-list {
+      list-style: none;
+      margin: 30px 0;
+      text-align: left;
+    }
+
+    .features-list li {
+      padding: 10px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .features-list li:before {
+      content: "✓ ";
+      color: #28a745;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      border-top: 1px solid #e9ecef;
+      color: #6c757d;
+    }
+
+    .video-demo {
+      width: 100%;
+      max-width: 800px;
+      margin: 40px auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <div class="logo">🎬 ProtoVid</div>
+      <a href="https://protovid.lemonsqueezy.com" class="cta-button">Get Premium</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Export Figma Prototypes<br>as Professional Videos</h1>
+      <p>High-quality MP4 and GIF exports with smooth transitions, animations, and cursor tracking.</p>
+      <a href="#install" class="cta-button">Install Plugin (Free)</a>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="container">
+      <h2>Why ProtoVid?</h2>
+      <div class="feature-grid">
+        <div class="feature">
+          <div class="feature-icon">🎥</div>
+          <h3>High-Quality Exports</h3>
+          <p>Export in 720p, 1080p, or 4K resolution at 30 or 60fps. Crystal clear, smooth videos.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🖱️</div>
+          <h3>Cursor Animation</h3>
+          <p>Show interaction flow with animated cursor movements. Perfect for tutorials and demos.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚡</div>
+          <h3>Fast Processing</h3>
+          <p>Cloud-powered video encoding means quick exports without bogging down your machine.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎨</div>
+          <h3>MP4 & GIF Support</h3>
+          <p>Export as MP4 video for presentations or GIF for easy sharing and embedding.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📐</div>
+          <h3>Prototype Flow Detection</h3>
+          <p>Automatically detects and captures your entire prototype flow with all transitions.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔒</div>
+          <h3>No Watermarks (Premium)</h3>
+          <p>Premium users get clean exports without watermarks or branding.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing">
+    <div class="container">
+      <h2>Simple Pricing</h2>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>Free</h3>
+          <div class="price">$0</div>
+          <ul class="features-list">
+            <li>3 exports per month</li>
+            <li>720p resolution</li>
+            <li>30fps</li>
+            <li>MP4 only</li>
+            <li>Watermarked</li>
+          </ul>
+          <a href="#install" class="cta-button">Get Started</a>
+        </div>
+        <div class="pricing-card featured">
+          <h3>Premium ⭐</h3>
+          <div class="price">$12<span>/month</span></div>
+          <ul class="features-list">
+            <li>Unlimited exports</li>
+            <li>Up to 4K resolution</li>
+            <li>30 or 60fps</li>
+            <li>MP4 & GIF formats</li>
+            <li>No watermarks</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="https://protovid.lemonsqueezy.com" class="cta-button">Upgrade Now</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" style="padding: 80px 0; text-align: center;">
+    <div class="container">
+      <h2 style="margin-bottom: 30px;">Get Started</h2>
+      <p style="font-size: 18px; margin-bottom: 30px;">Install ProtoVid from the Figma Community</p>
+      <a href="https://www.figma.com/community/plugin/protovid" class="cta-button" style="font-size: 18px;">Install Plugin</a>
+      <p style="margin-top: 20px; color: #6c757d;">Or search "ProtoVid" in Figma's plugin library</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 ProtoVid. Made with ❤️ for designers.</p>
+      <p style="margin-top: 10px;">
+        <a href="mailto:support@protovid.app" style="color: #4a90e2; text-decoration: none;">Support</a> |
+        <a href="/privacy" style="color: #4a90e2; text-decoration: none;">Privacy</a> |
+        <a href="/terms" style="color: #4a90e2; text-decoration: none;">Terms</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
