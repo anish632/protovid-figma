@@ -38,7 +38,7 @@ function App() {
     settings: {
       resolution: '720p',
       frameRate: 30,
-      format: 'mp4',
+      format: 'gif',
       showCursor: true
     },
     progress: {
@@ -263,10 +263,10 @@ function App() {
                   <select
                     value={state.settings.format}
                     onChange={(e) => updateSettings('format', e.currentTarget.value)}
-                    disabled={!state.isPremium && state.settings.format === 'gif'}
+                    disabled={false}
                   >
-                    <option value="mp4">Video</option>
-                    <option value="gif">GIF (Premium) ⭐</option>
+                    <option value="gif">GIF</option>
+                    <option value="mp4">MP4 Video (Premium) ⭐</option>
                   </select>
                 </label>
 
