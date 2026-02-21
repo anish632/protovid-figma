@@ -34,9 +34,14 @@ async function encodeMP4(
   settings: EncodeSettings,
   onProgress: ProgressCallback
 ): Promise<Uint8Array> {
-  if (typeof VideoEncoder === 'undefined') {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
     throw new Error(
-      'VideoEncoder API not available in this environment. Try updating Figma or use GIF format instead.'
+      'WebCodecs API not available in this environment. Try updating Figma or use GIF format instead.'
+    );
+  }
+  if (typeof OffscreenCanvas === 'undefined') {
+    throw new Error(
+      'OffscreenCanvas not available. Try updating Figma or use GIF format instead.'
     );
   }
 

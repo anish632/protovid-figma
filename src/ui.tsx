@@ -98,7 +98,7 @@ function App() {
           break;
 
         case 'encode-frames': {
-          const { frames, settings: encSettings } = msg.data;
+          const { frames, settings: encSettings, isPremium } = msg.data;
           try {
             const result = await encodeVideo(
               frames.map((f: any) => ({
@@ -123,7 +123,7 @@ function App() {
             }));
 
             parent.postMessage({
-              pluginMessage: { type: 'encoding-complete' }
+              pluginMessage: { type: 'encoding-complete', data: { isPremium } }
             }, '*');
           } catch (error: any) {
             setState(prev => ({

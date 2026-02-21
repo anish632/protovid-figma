@@ -90,7 +90,7 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
         break;
 
       case 'encoding-complete':
-        await handleEncodingComplete();
+        await handleEncodingComplete(msg.data?.isPremium ?? false);
         break;
 
       default:
@@ -99,7 +99,7 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
   } catch (error) {
     figma.ui.postMessage({
       type: 'error',
-      data: { message: error.message }
+      data: { message: error instanceof Error ? error.message : String(error) }
     });
   }
 };
@@ -209,6 +209,14 @@ async function handleExportVideo(settings: ExportSettings) {
 
   const capturedFrames = await capturePrototypeFrames(startFrame, settings);
 
+  if (capturedFrames.length === 0) {
+    figma.ui.postMessage({
+      type: 'error',
+      data: { message: 'No frames could be captured. Check that your prototype frames have visible content.' }
+    });
+    return;
+  }
+
   // Send captured frames to UI for client-side video encoding
   figma.ui.postMessage({
     type: 'encode-frames',
@@ -239,12 +247,6 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
   if (!licenseKey) return false;
 
   try {
-    // TODO: Call backend API to validate with Lemon Squeezy
-    // For now, accept placeholder keys for development
-    if (licenseKey.startsWith('DEV_') || licenseKey.startsWith('PREMIUM_')) {
-      return true;
-    }
-
     const response = await fetch('https://backend-one-nu-28.vercel.app/api/validate-license', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -309,7 +311,7 @@ async function capturePrototypeFrames(
         type: 'progress',
         data: { 
           stage: 'capturing', 
-          percent: 20 + (frames.length * 40 / Math.max(visited.size, 10))
+          percent: Math.min(60, 20 + (frames.length * 40 / Math.max(visited.size, 10)))
         }
       });
 
@@ -329,8 +331,7 @@ function calculateScale(frame: FrameNode, targetRes: { width: number; height: nu
 }
 
 // Handle encoding completion from UI
-async function handleEncodingComplete() {
-  const isPremium = await validateLicense(currentSettings.licenseKey);
+async function handleEncodingComplete(isPremium: boolean) {
   if (!isPremium) {
     exportCount++;
     await saveExportCount(exportCount);
@@ -374,7 +375,8 @@ function getPrototypeDestinations(frame: FrameNode): FrameNode[] {
     if ('reactions' in node && node.reactions) {
       for (const reaction of node.reactions) {
         if (reaction.action && reaction.action.type === 'NODE') {
-          const destNode = figma.getNodeById(reaction.action.destinationId!);
+          if (!reaction.action.destinationId) continue;
+          const destNode = figma.getNodeById(reaction.action.destinationId);
           if (destNode && destNode.type === 'FRAME') {
             destinations.push(destNode as FrameNode);
           }
