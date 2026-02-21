@@ -14,7 +14,7 @@ interface AppState {
   settings: {
     resolution: '720p' | '1080p' | '4K';
     frameRate: 30 | 60;
-    format: 'mp4' | 'gif';
+    format: 'mp4';
     showCursor: boolean;
   };
   progress: {
@@ -260,13 +260,8 @@ function App() {
 
                 <label>
                   <span>Format</span>
-                  <select
-                    value={state.settings.format}
-                    onChange={(e) => updateSettings('format', e.currentTarget.value)}
-                    disabled={false}
-                  >
+                  <select value="mp4" disabled={true}>
                     <option value="mp4">MP4 Video</option>
-                    <option value="gif">GIF</option>
                   </select>
                 </label>
 

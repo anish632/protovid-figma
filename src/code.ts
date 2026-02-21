@@ -3,7 +3,7 @@
 interface ExportSettings {
   resolution: '720p' | '1080p' | '4K';
   frameRate: 30 | 60;
-  format: 'mp4' | 'gif';
+  format: 'mp4';
   showCursor: boolean;
   licenseKey?: string;
 }
@@ -177,13 +177,7 @@ async function handleExportVideo(settings: ExportSettings) {
       return;
     }
 
-    if (settings.format === 'mp4') {
-      figma.ui.postMessage({
-        type: 'error',
-        data: { message: 'MP4 export requires Premium. Free tier supports GIF format.' }
-      });
-      return;
-    }
+    // Format is always MP4
   }
 
   figma.ui.postMessage({
