@@ -35,18 +35,11 @@ const buildUI = () => {
   });
 };
 
-// Copy and inject UI HTML (with h264-mp4-encoder web build loaded first)
+// Copy and inject UI HTML
 const copyUI = () => {
   const html = fs.readFileSync('src/ui.html', 'utf8');
-  const hme = fs.readFileSync(
-    path.join(__dirname, 'node_modules/h264-mp4-encoder/embuild/dist/h264-mp4-encoder.web.js'),
-    'utf8'
-  );
   const js = fs.readFileSync('dist/ui.js', 'utf8');
-  const injected = html.replace(
-    '<!-- INJECT_JS -->',
-    `<script>${hme}</script>\n<script>${js}</script>`
-  );
+  const injected = html.replace('<!-- INJECT_JS -->', `<script>${js}</script>`);
   fs.writeFileSync('dist/ui.html', injected);
 };
 

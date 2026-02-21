@@ -15,7 +15,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "h264-mp4-encoder": "^1.0.12",
     "preact": "^10.19.3"
   }
 }
