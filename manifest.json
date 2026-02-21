@@ -8,7 +8,7 @@
   "networkAccess": {
     "allowedDomains": [
       "https://api.lemonsqueezy.com",
-      "https://*.vercel.app"
+      "https://backend-one-nu-28.vercel.app"
     ]
   }
 }

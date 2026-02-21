@@ -215,13 +215,15 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
       return true;
     }
 
-    // In production, this would call your API:
-    // const response = await fetch('https://your-api.vercel.app/api/validate-license', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ licenseKey })
-    // });
-    // return response.ok;
+    const response = await fetch('https://backend-one-nu-28.vercel.app/api/validate-license', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.valid === true;
+    }
 
     return false;
   } catch (error) {
