@@ -1,7 +1,7 @@
 // ProtoVid - Client-side video encoder (runs in UI iframe context)
-// Uses gifenc for GIF and h264-mp4-encoder (WASM) for MP4.
+// Uses h264-mp4-encoder (WASM) for MP4 — loaded via script tag, accessed as global.
 
-import HME from 'h264-mp4-encoder';
+declare var HME: { createH264MP4Encoder: () => Promise<any> };
 
 interface FrameInput {
   imageData: Uint8Array;
@@ -30,7 +30,7 @@ function getCanvas(width: number, height: number): { canvas: HTMLCanvasElement |
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext('2d');
     if (ctx) return { canvas, ctx };
-  } catch {}
+  } catch (_e) {}
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
