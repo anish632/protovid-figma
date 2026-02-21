@@ -1,0 +1,3 @@
+module.exports=[995,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(63663);a.n(d("[project]/Apps/protovid-figma/backend/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},10067,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(63663);a.n(d("[project]/Apps/protovid-figma/backend/node_modules/next/dist/client/components/builtin/global-error.js"))},35932,a=>{"use strict";a.i(995);var b=a.i(10067);a.n(b)}];
+
+//# sourceMappingURL=f428a_next_dist_client_components_builtin_global-error_c4930688.js.map

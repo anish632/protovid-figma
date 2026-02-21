@@ -1,0 +1,3 @@
+{
+  "/api/encode-video/route": "app/api/encode-video/route.js"
+}

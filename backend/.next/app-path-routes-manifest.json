@@ -1,0 +1,7 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/encode-video/route": "/api/encode-video",
+  "/api/validate-license/route": "/api/validate-license",
+  "/page": "/"
+}
