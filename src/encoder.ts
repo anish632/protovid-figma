@@ -197,8 +197,33 @@ async function encodeAVI(
   return createMJPEGAVI(jpegFrames, width, height, fps);
 }
 
+const BACKEND_URL = 'https://backend-one-nu-28.vercel.app';
+
+/**
+ * Upload MJPEG AVI to backend for server-side transcoding to H.264 MP4.
+ * Returns the MP4 data or null if transcoding fails.
+ */
+async function transcodeToMP4(aviData: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/encode-video`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: aviData,
+    });
+
+    if (!response.ok) return null;
+
+    const buf = await response.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (_e) {
+    return null;
+  }
+}
+
 /**
  * Main entry point — encode frames to video.
+ * Encodes MJPEG AVI locally, then uploads to server for MP4 transcoding.
+ * Falls back to AVI download if server transcoding fails.
  */
 export async function encodeVideo(
   frames: FrameInput[],
@@ -209,10 +234,24 @@ export async function encodeVideo(
     throw new Error('No frames to encode');
   }
 
-  const data = await encodeAVI(frames, settings, onProgress);
-  const blob = new Blob([data], { type: 'video/avi' });
+  const aviData = await encodeAVI(frames, settings, onProgress);
+
+  // Attempt server-side transcoding to MP4
+  onProgress(92);
+  const mp4Data = await transcodeToMP4(aviData);
+
+  if (mp4Data) {
+    const blob = new Blob([mp4Data], { type: 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+    const filename = `protovid-export-${Date.now()}.mp4`;
+    onProgress(100);
+    return { url, filename };
+  }
+
+  // Fallback: serve the AVI directly
+  const blob = new Blob([aviData], { type: 'video/avi' });
   const url = URL.createObjectURL(blob);
   const filename = `protovid-export-${Date.now()}.avi`;
-
+  onProgress(100);
   return { url, filename };
 }

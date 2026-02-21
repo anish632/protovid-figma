@@ -1,48 +1,80 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { execFile } from 'child_process';
+import { writeFile, readFile, unlink } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import path from 'path';
+
+// ffmpeg-static exports the path to the ffmpeg binary
+import ffmpegPath from 'ffmpeg-static';
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
+  return new Response(null, { status: 204 });
 }
 
 export async function POST(request: NextRequest) {
+  const id = randomUUID();
+  const inputPath = path.join('/tmp', `input-${id}.avi`);
+  const outputPath = path.join('/tmp', `output-${id}.mp4`);
+
   try {
-    const { frames, settings, isPremium } = await request.json();
-
-    if (!frames || frames.length === 0) {
-      return NextResponse.json({ error: 'No frames provided' }, { status: 400 });
+    // Read raw AVI binary from request body
+    const body = await request.arrayBuffer();
+    if (!body || body.byteLength === 0) {
+      return Response.json({ error: 'No video data provided' }, { status: 400 });
     }
 
-    // Free tier restrictions (server-side enforcement)
-    if (!isPremium) {
-      if (settings.resolution !== '720p') {
-        return NextResponse.json({ error: 'HD/4K requires Premium' }, { status: 403 });
-      }
-      if (settings.format === 'gif') {
-        return NextResponse.json({ error: 'GIF export requires Premium' }, { status: 403 });
-      }
-    }
+    // Write AVI to temp file
+    await writeFile(inputPath, Buffer.from(body));
 
-    // For MVP: Use client-side Canvas API approach instead of server-side FFmpeg.
-    // The plugin will capture frames and we return a "ready" signal.
-    // Phase 2 will add actual server-side FFmpeg encoding.
-    //
-    // Why: Vercel serverless has a 10s/50MB limit on Hobby.
-    // Video encoding needs either:
-    // - A long-running server (your OCI instance when it lands)
-    // - Or client-side WebCodecs/Canvas approach
-    
-    return NextResponse.json({
-      success: true,
-      method: 'client-side',
-      message: 'Use client-side encoding. Server encoding available on Pro plan.',
-      frameCount: frames.length,
-      settings,
+    // Transcode MJPEG AVI → H.264 MP4 via FFmpeg
+    await new Promise<void>((resolve, reject) => {
+      if (!ffmpegPath) {
+        reject(new Error('ffmpeg binary not found'));
+        return;
+      }
+
+      execFile(
+        ffmpegPath,
+        [
+          '-y',                    // Overwrite output
+          '-i', inputPath,         // Input AVI
+          '-c:v', 'libx264',      // H.264 codec
+          '-pix_fmt', 'yuv420p',  // Max compatibility
+          '-movflags', '+faststart', // Moov atom at front for instant playback
+          '-preset', 'ultrafast', // Fastest encoding (small files, fine quality)
+          outputPath,
+        ],
+        { timeout: 8000 },       // 8s timeout (Vercel Hobby = 10s)
+        (error, _stdout, stderr) => {
+          if (error) {
+            console.error('FFmpeg stderr:', stderr);
+            reject(new Error(`FFmpeg failed: ${error.message}`));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    // Read the output MP4
+    const mp4Data = await readFile(outputPath);
+
+    return new Response(mp4Data, {
+      status: 200,
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
   } catch (error) {
-    console.error('Encode video error:', error);
-    return NextResponse.json(
-      { error: 'Video encoding failed' },
+    console.error('Transcode error:', error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : 'Transcoding failed' },
       { status: 500 }
     );
+  } finally {
+    // Clean up temp files
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
   }
 }
