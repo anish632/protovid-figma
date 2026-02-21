@@ -127,20 +127,8 @@ async function handleInit() {
 
 // Scan for prototype flows
 async function handleScanPrototype() {
-  const allFrameIds = new Set<string>();
-  
-  // First pass: find frames with interactions and their destinations
-  for (const node of figma.currentPage.children) {
-    if (isExportableFrame(node) && hasPrototypeInteractions(node as SceneNode)) {
-      allFrameIds.add(node.id);
-      const dests = await getPrototypeDestinations(node as FrameNode);
-      for (const dest of dests) {
-        allFrameIds.add(dest.id);
-      }
-    }
-  }
+  const { allFrameIds } = await buildPrototypeGraph();
 
-  // Build frame list from all discovered IDs
   const frames: any[] = [];
   for (const id of allFrameIds) {
     const node = await figma.getNodeByIdAsync(id);
@@ -150,7 +138,6 @@ async function handleScanPrototype() {
         name: node.name,
         width: (node as FrameNode).width,
         height: (node as FrameNode).height,
-        hasInteractions: true
       });
     }
   }

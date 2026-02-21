@@ -1,7 +1,6 @@
 // ProtoVid - Client-side video encoder (runs in UI iframe context)
 // Uses gifenc for GIF and h264-mp4-encoder (WASM) for MP4.
 
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 import HME from 'h264-mp4-encoder';
 
 interface FrameInput {
@@ -11,7 +10,7 @@ interface FrameInput {
 }
 
 interface EncodeSettings {
-  format: 'mp4' | 'gif';
+  format: 'mp4';
   frameRate: 30 | 60;
 }
 
@@ -87,47 +86,7 @@ async function encodeMP4(
 }
 
 /**
- * Encode prototype frames as animated GIF.
- */
-async function encodeGIF(
-  frames: FrameInput[],
-  _settings: EncodeSettings,
-  onProgress: ProgressCallback
-): Promise<Uint8Array> {
-  const first = await loadPNG(frames[0].imageData);
-  const width = first.width;
-  const height = first.height;
-  first.close();
-
-  const gif = GIFEncoder();
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to create canvas context');
-
-  const delay = FRAME_HOLD_SECONDS * 100;
-
-  for (let i = 0; i < frames.length; i++) {
-    const bmp = await loadPNG(frames[i].imageData);
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(bmp, 0, 0, width, height);
-    bmp.close();
-
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const palette = quantize(imgData.data, 256);
-    const indexed = applyPalette(imgData.data, palette);
-
-    gif.writeFrame(indexed, width, height, { palette, delay });
-    onProgress(60 + ((i + 1) / frames.length) * 30);
-  }
-
-  gif.finish();
-  return gif.bytesView();
-}
-
-/**
- * Main entry point — encode frames to the requested format.
+ * Main entry point — encode frames to MP4 video.
  */
 export async function encodeVideo(
   frames: FrameInput[],
@@ -138,23 +97,10 @@ export async function encodeVideo(
     throw new Error('No frames to encode');
   }
 
-  let data: Uint8Array;
-  let mime: string;
-  let ext: string;
-
-  if (settings.format === 'gif') {
-    data = await encodeGIF(frames, settings, onProgress);
-    mime = 'image/gif';
-    ext = 'gif';
-  } else {
-    data = await encodeMP4(frames, settings, onProgress);
-    mime = 'video/mp4';
-    ext = 'mp4';
-  }
-
-  const blob = new Blob([data], { type: mime });
+  const data = await encodeMP4(frames, settings, onProgress);
+  const blob = new Blob([data], { type: 'video/mp4' });
   const url = URL.createObjectURL(blob);
-  const filename = `protovid-export-${Date.now()}.${ext}`;
+  const filename = `protovid-export-${Date.now()}.mp4`;
 
   return { url, filename };
 }

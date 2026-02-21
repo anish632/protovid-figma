@@ -247,32 +247,9 @@ function App() {
                   </select>
                 </label>
 
-                <label>
-                  <span>Frame Rate</span>
-                  <select
-                    value={state.settings.frameRate}
-                    onChange={(e) => updateSettings('frameRate', parseInt(e.currentTarget.value))}
-                  >
-                    <option value="30">30 fps</option>
-                    <option value="60">60 fps</option>
-                  </select>
-                </label>
+{/* Frame rate is automatic */}
 
-                <label>
-                  <span>Format</span>
-                  <select value="mp4" disabled={true}>
-                    <option value="mp4">MP4 Video</option>
-                  </select>
-                </label>
-
-                <label class="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={state.settings.showCursor}
-                    onChange={(e) => updateSettings('showCursor', e.currentTarget.checked)}
-                  />
-                  <span>Show cursor animation</span>
-                </label>
+                <p class="small">Output: MP4 Video</p>
               </div>
 
               <div class="section">
@@ -285,7 +262,7 @@ function App() {
                   <>
                     <div class="license-info">
                       <p>Free: <strong>{remainingExports}/{state.freeLimit}</strong> exports remaining</p>
-                      <p class="small">720p only, watermarked</p>
+                      <p class="small">720p only</p>
                     </div>
                     <input
                       type="text"
@@ -301,7 +278,7 @@ function App() {
                     >
                       Validate License
                     </button>
-                    <a href="https://protovid.lemonsqueezy.com" target="_blank" class="link">
+                    <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">
                       Get Premium ($12/mo) →
                     </a>
                   </>
@@ -346,7 +323,7 @@ function App() {
           {!state.isPremium && (
             <div class="alert alert-info">
               <p>Exports remaining: <strong>{remainingExports}</strong></p>
-              <a href="https://protovid.lemonsqueezy.com" target="_blank" class="link">
+              <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">
                 Upgrade to Premium for unlimited exports →
               </a>
             </div>
@@ -363,7 +340,7 @@ function App() {
 
       <footer>
         <p class="small">
-          Need help? <a href="https://protovid.app/docs" target="_blank" class="link">View Docs</a>
+          ProtoVid by <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">Das Group</a>
         </p>
       </footer>
     </div>
