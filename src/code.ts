@@ -32,7 +32,7 @@ async function loadExportCount(): Promise<number> {
   try {
     const count = await figma.clientStorage.getAsync('exportCount');
     return typeof count === 'number' ? count : 0;
-  } catch {
+  } catch (_e) {
     return 0;
   }
 }
@@ -49,7 +49,7 @@ async function saveExportCount(count: number) {
 async function loadLicenseKey(): Promise<string | null> {
   try {
     return await figma.clientStorage.getAsync('licenseKey') || null;
-  } catch {
+  } catch (_e) {
     return null;
   }
 }
@@ -345,9 +345,12 @@ async function handleEncodingComplete(isPremium: boolean) {
 // Helper: Check if node has prototype interactions
 function hasPrototypeInteractions(node: SceneNode): boolean {
   if ('reactions' in node && node.reactions && node.reactions.length > 0) {
-    return node.reactions.some(reaction => 
-      reaction.action && reaction.action.type === 'NODE'
-    );
+    return node.reactions.some((reaction: any) => {
+      if (reaction.actions && Array.isArray(reaction.actions)) {
+        return reaction.actions.some((a: any) => a && a.type === 'NODE');
+      }
+      return reaction.action && reaction.action.type === 'NODE';
+    });
   }
   
   if ('children' in node) {
@@ -370,16 +373,31 @@ function findPrototypeStartFrame(): FrameNode | null {
 // Helper: Get prototype destination frames
 function getPrototypeDestinations(frame: FrameNode): FrameNode[] {
   const destinations: FrameNode[] = [];
+  const seen = new Set<string>();
+  
+  function addDestination(destinationId: string | null | undefined) {
+    if (!destinationId || seen.has(destinationId)) return;
+    seen.add(destinationId);
+    const destNode = figma.getNodeById(destinationId);
+    if (destNode && destNode.type === 'FRAME') {
+      destinations.push(destNode as FrameNode);
+    }
+  }
   
   function findDestinations(node: SceneNode) {
     if ('reactions' in node && node.reactions) {
       for (const reaction of node.reactions) {
-        if (reaction.action && reaction.action.type === 'NODE') {
-          if (!reaction.action.destinationId) continue;
-          const destNode = figma.getNodeById(reaction.action.destinationId);
-          if (destNode && destNode.type === 'FRAME') {
-            destinations.push(destNode as FrameNode);
+        // New API: reaction.actions (array)
+        if ('actions' in reaction && Array.isArray((reaction as any).actions)) {
+          for (const action of (reaction as any).actions) {
+            if (action && action.type === 'NODE') {
+              addDestination(action.destinationId);
+            }
           }
+        }
+        // Old API: reaction.action (singular)
+        if (reaction.action && reaction.action.type === 'NODE') {
+          addDestination((reaction.action as any).destinationId);
         }
       }
     }
