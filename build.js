@@ -32,6 +32,9 @@ const buildUI = () => {
     jsxFactory: 'h',
     jsxFragment: 'Fragment',
     logLevel: 'info',
+    alias: {
+      'h264-mp4-encoder': 'h264-mp4-encoder/embuild/dist/h264-mp4-encoder.web.js',
+    },
   });
 };
 

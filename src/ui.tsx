@@ -38,7 +38,7 @@ function App() {
     settings: {
       resolution: '720p',
       frameRate: 30,
-      format: 'gif',
+      format: 'mp4',
       showCursor: true
     },
     progress: {
@@ -265,8 +265,8 @@ function App() {
                     onChange={(e) => updateSettings('format', e.currentTarget.value)}
                     disabled={false}
                   >
+                    <option value="mp4">MP4 Video</option>
                     <option value="gif">GIF</option>
-                    <option value="mp4">MP4 Video (Premium) ⭐</option>
                   </select>
                 </label>
 
