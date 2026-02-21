@@ -110,15 +110,14 @@ async function handleInit() {
   exportCount = await loadExportCount();
   const savedKey = await loadLicenseKey();
 
-  const prototypeNodes = figma.currentPage.children.filter(
-    node => node.type === 'FRAME' && hasPrototypeInteractions(node)
-  );
+  // Build graph to count ALL prototype-connected frames (sources + destinations)
+  const { allFrameIds } = await buildPrototypeGraph();
 
   figma.ui.postMessage({
     type: 'init-complete',
     data: {
-      hasPrototype: prototypeNodes.length > 0,
-      frameCount: prototypeNodes.length,
+      hasPrototype: allFrameIds.size > 0,
+      frameCount: allFrameIds.size,
       exportCount,
       freeLimit: FREE_TIER_LIMIT,
       savedLicenseKey: savedKey
@@ -128,22 +127,34 @@ async function handleInit() {
 
 // Scan for prototype flows
 async function handleScanPrototype() {
-  const frames: any[] = [];
+  const allFrameIds = new Set<string>();
   
-  // Find all frames with prototype interactions
+  // First pass: find frames with interactions and their destinations
   for (const node of figma.currentPage.children) {
-    if (node.type === 'FRAME' && hasPrototypeInteractions(node)) {
+    if (isExportableFrame(node) && hasPrototypeInteractions(node as SceneNode)) {
+      allFrameIds.add(node.id);
+      const dests = await getPrototypeDestinations(node as FrameNode);
+      for (const dest of dests) {
+        allFrameIds.add(dest.id);
+      }
+    }
+  }
+
+  // Build frame list from all discovered IDs
+  const frames: any[] = [];
+  for (const id of allFrameIds) {
+    const node = await figma.getNodeByIdAsync(id);
+    if (node && isExportableFrame(node)) {
       frames.push({
         id: node.id,
         name: node.name,
-        width: node.width,
-        height: node.height,
+        width: (node as FrameNode).width,
+        height: (node as FrameNode).height,
         hasInteractions: true
       });
     }
   }
 
-  // Analyze prototype flow
   const flow = analyzePrototypeFlow(frames);
 
   figma.ui.postMessage({
@@ -186,7 +197,7 @@ async function handleExportVideo(settings: ExportSettings) {
   });
 
   // Find starting frame
-  const startFrame = findPrototypeStartFrame();
+  const startFrame = await findPrototypeStartFrame();
   if (!startFrame) {
     figma.ui.postMessage({
       type: 'error',
@@ -201,9 +212,7 @@ async function handleExportVideo(settings: ExportSettings) {
     data: { stage: 'capturing', percent: 20 }
   });
 
-  console.log('Start frame:', startFrame.name, startFrame.id);
   const capturedFrames = await capturePrototypeFrames(startFrame, settings);
-  console.log('Captured frames:', capturedFrames.length, capturedFrames.map(f => f.nodeName));
 
   if (capturedFrames.length === 0) {
     figma.ui.postMessage({
@@ -260,38 +269,97 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
   }
 }
 
-// Capture frames from prototype flow
+// Helper: Check if a node type can be exported as a prototype frame
+function isExportableFrame(node: BaseNode): boolean {
+  return node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET';
+}
+
+// Helper: Extract destination node IDs from a reaction (handles both current and deprecated APIs)
+function extractDestinationIds(reaction: any): string[] {
+  const ids: string[] = [];
+  // Current API: reaction.actions (array)
+  if (Array.isArray(reaction.actions)) {
+    for (const action of reaction.actions) {
+      if (action && action.type === 'NODE' && action.destinationId) {
+        ids.push(action.destinationId);
+      }
+    }
+  }
+  // Deprecated API: reaction.action (singular)
+  if (reaction.action && reaction.action.type === 'NODE' && reaction.action.destinationId) {
+    ids.push(reaction.action.destinationId);
+  }
+  return ids;
+}
+
+// Build a global map of prototype connections by walking ALL nodes on the page.
+// Uses getNodeByIdAsync (required for dynamic-page documentAccess).
+async function buildPrototypeGraph(): Promise<{
+  edges: Map<string, Set<string>>;
+  allFrameIds: Set<string>;
+}> {
+  const edges = new Map<string, Set<string>>();
+  const allFrameIds = new Set<string>();
+
+  async function walkNode(node: SceneNode, sourceFrameId: string) {
+    if ('reactions' in node && node.reactions && node.reactions.length > 0) {
+      for (const reaction of node.reactions) {
+        for (const destId of extractDestinationIds(reaction)) {
+          const destNode = await figma.getNodeByIdAsync(destId);
+          if (destNode && isExportableFrame(destNode)) {
+            if (!edges.has(sourceFrameId)) edges.set(sourceFrameId, new Set());
+            edges.get(sourceFrameId)!.add(destId);
+            allFrameIds.add(destId);
+          }
+        }
+      }
+    }
+    if ('children' in node) {
+      for (const child of (node as any).children) {
+        await walkNode(child, sourceFrameId);
+      }
+    }
+  }
+
+  for (const topNode of figma.currentPage.children) {
+    if (isExportableFrame(topNode)) {
+      await walkNode(topNode as SceneNode, topNode.id);
+    }
+  }
+
+  // Add source frames (those with outgoing edges) to allFrameIds
+  for (const sourceId of edges.keys()) {
+    allFrameIds.add(sourceId);
+  }
+
+  return { edges, allFrameIds };
+}
+
+// Capture frames from prototype flow using global graph
 async function capturePrototypeFrames(
   startFrame: FrameNode,
   settings: ExportSettings
 ): Promise<PrototypeFrame[]> {
+  const { edges, allFrameIds } = await buildPrototypeGraph();
   const frames: PrototypeFrame[] = [];
   const visited = new Set<string>();
-  const queue: FrameNode[] = [startFrame];
+  const queue: string[] = [startFrame.id];
 
   const resolutionMap = {
     '720p': { width: 1280, height: 720 },
     '1080p': { width: 1920, height: 1080 },
     '4K': { width: 3840, height: 2160 }
   };
-
   const targetRes = resolutionMap[settings.resolution];
+  const totalFrames = Math.max(allFrameIds.size, 1);
 
-  while (queue.length > 0) {
-    const frame = queue.shift()!;
-    
-    if (visited.has(frame.id)) continue;
-    visited.add(frame.id);
-
-    // Always discover next frames, regardless of export success
-    const nextFrames = await getPrototypeDestinations(frame);
-    queue.push(...nextFrames);
+  async function exportFrame(frameId: string) {
+    const node = await figma.getNodeByIdAsync(frameId);
+    if (!node || !isExportableFrame(node)) return;
+    const frame = node as FrameNode;
 
     try {
-      // Export frame as PNG — cap scale to avoid huge exports
       const scale = Math.min(calculateScale(frame, targetRes), 4);
-      console.log('Exporting frame:', frame.name, 'scale:', scale, 'size:', frame.width, 'x', frame.height);
-      
       const imageData = await frame.exportAsync({
         format: 'PNG',
         constraint: { type: 'SCALE', value: scale }
@@ -305,18 +373,39 @@ async function capturePrototypeFrames(
         height: Math.round(frame.height * scale)
       });
 
-      // Update progress
       figma.ui.postMessage({
         type: 'progress',
-        data: { 
-          stage: 'capturing', 
-          percent: Math.min(60, 20 + (frames.length * 40 / Math.max(visited.size, 10)))
+        data: {
+          stage: 'capturing',
+          percent: Math.min(60, 20 + (frames.length * 40 / totalFrames))
         }
       });
-
     } catch (_e) {
       console.error('Failed to export frame ' + frame.name + ':', _e);
     }
+  }
+
+  // BFS through prototype graph
+  while (queue.length > 0) {
+    const frameId = queue.shift()!;
+    if (visited.has(frameId)) continue;
+    visited.add(frameId);
+
+    const destinations = edges.get(frameId);
+    if (destinations) {
+      for (const destId of destinations) {
+        if (!visited.has(destId)) queue.push(destId);
+      }
+    }
+
+    await exportFrame(frameId);
+  }
+
+  // Fallback: capture any prototype-connected frames missed by BFS
+  for (const frameId of allFrameIds) {
+    if (visited.has(frameId)) continue;
+    visited.add(frameId);
+    await exportFrame(frameId);
   }
 
   return frames;
@@ -344,73 +433,36 @@ async function handleEncodingComplete(isPremium: boolean) {
 // Helper: Check if node has prototype interactions
 function hasPrototypeInteractions(node: SceneNode): boolean {
   if ('reactions' in node && node.reactions && node.reactions.length > 0) {
-    return node.reactions.some((reaction: any) => {
-      if (reaction.actions && Array.isArray(reaction.actions)) {
-        return reaction.actions.some((a: any) => a && a.type === 'NODE');
-      }
-      return reaction.action && reaction.action.type === 'NODE';
-    });
+    for (const reaction of node.reactions) {
+      if (extractDestinationIds(reaction).length > 0) return true;
+    }
   }
-  
   if ('children' in node) {
-    return node.children.some(child => hasPrototypeInteractions(child));
+    return (node as any).children.some((child: SceneNode) => hasPrototypeInteractions(child));
   }
-  
   return false;
 }
 
-// Helper: Find prototype start frame (first frame or marked start)
-function findPrototypeStartFrame(): FrameNode | null {
+// Helper: Find prototype start frame using flowStartingPoints with fallback
+async function findPrototypeStartFrame(): Promise<FrameNode | null> {
+  // Try flowStartingPoints API first
+  const flows = figma.currentPage.flowStartingPoints;
+  if (flows && flows.length > 0) {
+    for (const flow of flows) {
+      const node = await figma.getNodeByIdAsync(flow.nodeId);
+      if (node && isExportableFrame(node)) {
+        return node as FrameNode;
+      }
+    }
+  }
+
+  // Fallback: first top-level frame with prototype interactions
   for (const node of figma.currentPage.children) {
-    if (node.type === 'FRAME' && hasPrototypeInteractions(node)) {
+    if (isExportableFrame(node) && hasPrototypeInteractions(node as SceneNode)) {
       return node as FrameNode;
     }
   }
   return null;
-}
-
-// Helper: Get prototype destination frames
-async function getPrototypeDestinations(frame: FrameNode): Promise<FrameNode[]> {
-  const destinations: FrameNode[] = [];
-  const seen = new Set<string>();
-  
-  async function addDestination(destinationId: string | null | undefined) {
-    if (!destinationId || seen.has(destinationId)) return;
-    seen.add(destinationId);
-    const destNode = await figma.getNodeByIdAsync(destinationId);
-    if (destNode && destNode.type === 'FRAME') {
-      destinations.push(destNode as FrameNode);
-    }
-  }
-  
-  async function findDestinations(node: SceneNode) {
-    if ('reactions' in node && node.reactions) {
-      console.log('Node', node.name, 'has', node.reactions.length, 'reactions:', JSON.stringify(node.reactions.map((r: any) => ({ action: r.action?.type, actions: r.actions?.map((a: any) => a?.type), destinationId: r.action?.destinationId }))));
-      for (const reaction of node.reactions) {
-        // New API: reaction.actions (array)
-        if ('actions' in reaction && Array.isArray((reaction as any).actions)) {
-          for (const action of (reaction as any).actions) {
-            if (action && action.type === 'NODE') {
-              await addDestination(action.destinationId);
-            }
-          }
-        }
-        // Old API: reaction.action (singular)
-        if (reaction.action && reaction.action.type === 'NODE') {
-          await addDestination((reaction.action as any).destinationId);
-        }
-      }
-    }
-    
-    if ('children' in node) {
-      for (const child of node.children) {
-        await findDestinations(child);
-      }
-    }
-  }
-  
-  await findDestinations(frame);
-  return destinations;
 }
 
 // Helper: Analyze prototype flow
