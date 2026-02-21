@@ -27,6 +27,41 @@ let currentSettings: ExportSettings = {
 let exportCount = 0; // Track free tier usage
 const FREE_TIER_LIMIT = 3;
 
+// Persist export count across plugin sessions using clientStorage
+async function loadExportCount(): Promise<number> {
+  try {
+    const count = await figma.clientStorage.getAsync('exportCount');
+    return typeof count === 'number' ? count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function saveExportCount(count: number) {
+  try {
+    await figma.clientStorage.setAsync('exportCount', count);
+  } catch (e) {
+    console.error('Failed to save export count:', e);
+  }
+}
+
+// Persist license key
+async function loadLicenseKey(): Promise<string | null> {
+  try {
+    return await figma.clientStorage.getAsync('licenseKey') || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveLicenseKey(key: string) {
+  try {
+    await figma.clientStorage.setAsync('licenseKey', key);
+  } catch (e) {
+    console.error('Failed to save license key:', e);
+  }
+}
+
 // Initialize plugin
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
@@ -67,6 +102,10 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
 
 // Initialize plugin state
 async function handleInit() {
+  // Load persisted state
+  exportCount = await loadExportCount();
+  const savedKey = await loadLicenseKey();
+
   const prototypeNodes = figma.currentPage.children.filter(
     node => node.type === 'FRAME' && hasPrototypeInteractions(node)
   );
@@ -77,7 +116,8 @@ async function handleInit() {
       hasPrototype: prototypeNodes.length > 0,
       frameCount: prototypeNodes.length,
       exportCount,
-      freeLimit: FREE_TIER_LIMIT
+      freeLimit: FREE_TIER_LIMIT,
+      savedLicenseKey: savedKey
     }
   });
 }
@@ -181,6 +221,7 @@ async function handleExportVideo(settings: ExportSettings) {
   // Increment export count for free tier
   if (!isPremium) {
     exportCount++;
+    await saveExportCount(exportCount);
   }
 
   figma.ui.postMessage({
@@ -199,6 +240,10 @@ async function handleExportVideo(settings: ExportSettings) {
 async function handleValidateLicense(licenseKey: string) {
   const isValid = await validateLicense(licenseKey);
   
+  if (isValid) {
+    await saveLicenseKey(licenseKey);
+  }
+
   figma.ui.postMessage({
     type: 'license-validated',
     data: { isValid, licenseKey }

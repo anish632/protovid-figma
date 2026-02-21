@@ -64,8 +64,18 @@ function App() {
             hasPrototype: msg.data.hasPrototype,
             frameCount: msg.data.frameCount,
             exportCount: msg.data.exportCount,
-            freeLimit: msg.data.freeLimit
+            freeLimit: msg.data.freeLimit,
+            licenseKey: msg.data.savedLicenseKey || ''
           }));
+          // Auto-validate saved license key
+          if (msg.data.savedLicenseKey) {
+            parent.postMessage({
+              pluginMessage: {
+                type: 'validate-license',
+                data: { licenseKey: msg.data.savedLicenseKey }
+              }
+            }, '*');
+          }
           break;
 
         case 'scan-complete':
