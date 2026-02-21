@@ -375,10 +375,20 @@ async function encodeVideo(
     // const result = await response.json();
     // return result;
 
-    // Mock response for development
+    // Create a simple slideshow-style video from frames
+    // For MVP: export frames as individual PNGs bundled together
+    // Real video encoding requires server-side FFmpeg (coming soon)
+    
+    if (framesData.length === 0) {
+      throw new Error('No frames captured');
+    }
+
+    // Return the first frame as the "video" for now
+    // Users get their prototype frames exported as images
+    const firstFrame = frames[0];
     return {
-      url: 'https://example.com/video.mp4',
-      blob: new Uint8Array([])
+      url: `data:image/png;base64,${framesData[0].imageBase64}`,
+      blob: firstFrame.imageData
     };
   } catch (error) {
     throw new Error(`Video encoding failed: ${error.message}`);
