@@ -88,7 +88,11 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
       case 'cancel':
         figma.closePlugin();
         break;
-      
+
+      case 'encoding-complete':
+        await handleEncodingComplete();
+        break;
+
       default:
         console.log('Unknown message type:', msg.type);
     }
@@ -205,35 +209,16 @@ async function handleExportVideo(settings: ExportSettings) {
 
   const capturedFrames = await capturePrototypeFrames(startFrame, settings);
 
+  // Send captured frames to UI for client-side video encoding
   figma.ui.postMessage({
-    type: 'progress',
-    data: { stage: 'encoding', percent: 60 }
-  });
-
-  // Send to backend for video encoding
-  const videoData = await encodeVideo(capturedFrames, settings, isPremium);
-
-  figma.ui.postMessage({
-    type: 'progress',
-    data: { stage: 'finalizing', percent: 90 }
-  });
-
-  // Increment export count for free tier
-  if (!isPremium) {
-    exportCount++;
-    await saveExportCount(exportCount);
-  }
-
-  figma.ui.postMessage({
-    type: 'export-complete',
+    type: 'encode-frames',
     data: {
-      videoUrl: videoData.url,
-      videoBlob: videoData.blob,
-      filename: `protovid-export-${Date.now()}.${settings.format}`,
-      exportCount,
+      frames: capturedFrames,
+      settings,
       isPremium
     }
   });
+  // Export count is incremented when UI sends 'encoding-complete' back
 }
 
 // Validate Lemon Squeezy license key
@@ -343,56 +328,17 @@ function calculateScale(frame: FrameNode, targetRes: { width: number; height: nu
   return Math.min(scaleX, scaleY);
 }
 
-// Encode frames into video
-async function encodeVideo(
-  frames: PrototypeFrame[],
-  settings: ExportSettings,
-  isPremium: boolean
-): Promise<{ url: string; blob: Uint8Array }> {
-  try {
-    // In production, send frames to backend API for FFmpeg encoding
-    // For now, return mock data structure
-    
-    // Convert frames to base64 for transmission
-    const framesData = frames.map(f => ({
-      nodeId: f.nodeId,
-      nodeName: f.nodeName,
-      imageBase64: uint8ArrayToBase64(f.imageData),
-      width: f.width,
-      height: f.height
-    }));
-
-    // TODO: Call backend API
-    // const response = await fetch('https://your-api.vercel.app/api/encode-video', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     frames: framesData,
-    //     settings,
-    //     isPremium
-    //   })
-    // });
-    // const result = await response.json();
-    // return result;
-
-    // Create a simple slideshow-style video from frames
-    // For MVP: export frames as individual PNGs bundled together
-    // Real video encoding requires server-side FFmpeg (coming soon)
-    
-    if (framesData.length === 0) {
-      throw new Error('No frames captured');
-    }
-
-    // Return the first frame as the "video" for now
-    // Users get their prototype frames exported as images
-    const firstFrame = frames[0];
-    return {
-      url: `data:image/png;base64,${framesData[0].imageBase64}`,
-      blob: firstFrame.imageData
-    };
-  } catch (error) {
-    throw new Error(`Video encoding failed: ${error.message}`);
+// Handle encoding completion from UI
+async function handleEncodingComplete() {
+  const isPremium = await validateLicense(currentSettings.licenseKey);
+  if (!isPremium) {
+    exportCount++;
+    await saveExportCount(exportCount);
   }
+  figma.ui.postMessage({
+    type: 'export-count-updated',
+    data: { exportCount }
+  });
 }
 
 // Helper: Check if node has prototype interactions
@@ -454,11 +400,3 @@ function analyzePrototypeFlow(frames: any[]) {
   };
 }
 
-// Helper: Convert Uint8Array to base64
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}

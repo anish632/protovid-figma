@@ -1,6 +1,7 @@
 // ProtoVid - Plugin UI (runs in iframe)
 import { h, Fragment, render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
+import { encodeVideo } from './encoder';
 
 interface AppState {
   stage: 'loading' | 'setup' | 'scanning' | 'exporting' | 'complete';
@@ -22,6 +23,7 @@ interface AppState {
   };
   error: string | null;
   videoUrl: string | null;
+  downloadFilename: string | null;
 }
 
 function App() {
@@ -44,7 +46,8 @@ function App() {
       percent: 0
     },
     error: null,
-    videoUrl: null
+    videoUrl: null,
+    downloadFilename: null
   });
 
   useEffect(() => {
@@ -52,7 +55,7 @@ function App() {
     parent.postMessage({ pluginMessage: { type: 'init' } }, '*');
 
     // Listen for messages from plugin code
-    window.onmessage = (event) => {
+    window.onmessage = async (event) => {
       const msg = event.data.pluginMessage;
       if (!msg) return;
 
@@ -94,13 +97,48 @@ function App() {
           }));
           break;
 
-        case 'export-complete':
+        case 'encode-frames': {
+          const { frames, settings: encSettings } = msg.data;
+          try {
+            const result = await encodeVideo(
+              frames.map((f: any) => ({
+                imageData: f.imageData instanceof Uint8Array ? f.imageData : new Uint8Array(f.imageData),
+                width: f.width,
+                height: f.height,
+              })),
+              encSettings,
+              (percent: number) => {
+                setState(prev => ({
+                  ...prev,
+                  progress: { stage: 'encoding', percent }
+                }));
+              }
+            );
+
+            setState(prev => ({
+              ...prev,
+              stage: 'complete',
+              videoUrl: result.url,
+              downloadFilename: result.filename,
+            }));
+
+            parent.postMessage({
+              pluginMessage: { type: 'encoding-complete' }
+            }, '*');
+          } catch (error: any) {
+            setState(prev => ({
+              ...prev,
+              stage: 'setup',
+              error: error.message || 'Video encoding failed'
+            }));
+          }
+          break;
+        }
+
+        case 'export-count-updated':
           setState(prev => ({
             ...prev,
-            stage: 'complete',
-            videoUrl: msg.data.videoUrl,
-            exportCount: msg.data.exportCount,
-            isPremium: msg.data.isPremium
+            exportCount: msg.data.exportCount
           }));
           break;
 
@@ -305,7 +343,7 @@ function App() {
           <p>Your prototype video is ready.</p>
           
           {state.videoUrl && (
-            <a href={state.videoUrl} download class="btn btn-primary">
+            <a href={state.videoUrl} download={state.downloadFilename || 'protovid-export'} class="btn btn-primary">
               Download Video
             </a>
           )}
@@ -320,7 +358,7 @@ function App() {
           )}
 
           <button
-            onClick={() => setState(prev => ({ ...prev, stage: 'setup', videoUrl: null }))}
+            onClick={() => setState(prev => ({ ...prev, stage: 'setup', videoUrl: null, downloadFilename: null }))}
             class="btn btn-secondary"
           >
             Export Another
