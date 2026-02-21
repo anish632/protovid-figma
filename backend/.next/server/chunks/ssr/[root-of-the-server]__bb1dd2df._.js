@@ -1,3 +1,0 @@
-module.exports=[93695,(a,b,c)=>{b.exports=a.x("next/dist/shared/lib/no-fallback-error.external.js",()=>require("next/dist/shared/lib/no-fallback-error.external.js"))},8818,a=>{a.n(a.i(24155))},31377,a=>{a.n(a.i(78333))},17974,a=>{a.n(a.i(82509))},54415,a=>{a.n(a.i(19815))},97633,a=>{"use strict";var b=a.i(58942);function c(){return(0,b.jsxs)("div",{style:{fontFamily:"system-ui",maxWidth:600,margin:"100px auto",textAlign:"center"},children:[(0,b.jsx)("h1",{children:"ProtoVid API"}),(0,b.jsx)("p",{children:"Professional Prototype Video Exporter for Figma"}),(0,b.jsx)("p",{style:{color:"#666"},children:"API endpoints: /api/validate-license, /api/encode-video"})]})}a.s(["default",()=>c])}];
-
-//# sourceMappingURL=%5Broot-of-the-server%5D__bb1dd2df._.js.map
