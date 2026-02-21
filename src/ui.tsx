@@ -265,7 +265,7 @@ function App() {
                     onChange={(e) => updateSettings('format', e.currentTarget.value)}
                     disabled={!state.isPremium && state.settings.format === 'gif'}
                   >
-                    <option value="mp4">MP4 Video</option>
+                    <option value="mp4">Video</option>
                     <option value="gif">GIF (Premium) ⭐</option>
                   </select>
                 </label>

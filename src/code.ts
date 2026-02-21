@@ -177,10 +177,10 @@ async function handleExportVideo(settings: ExportSettings) {
       return;
     }
 
-    if (settings.format === 'gif') {
+    if (settings.format === 'mp4') {
       figma.ui.postMessage({
         type: 'error',
-        data: { message: 'GIF export requires Premium. Please upgrade.' }
+        data: { message: 'MP4 export requires Premium. Free tier supports GIF format.' }
       });
       return;
     }
@@ -207,7 +207,9 @@ async function handleExportVideo(settings: ExportSettings) {
     data: { stage: 'capturing', percent: 20 }
   });
 
+  console.log('Start frame:', startFrame.name, startFrame.id);
   const capturedFrames = await capturePrototypeFrames(startFrame, settings);
+  console.log('Captured frames:', capturedFrames.length, capturedFrames.map(f => f.nodeName));
 
   if (capturedFrames.length === 0) {
     figma.ui.postMessage({
@@ -287,24 +289,27 @@ async function capturePrototypeFrames(
     if (visited.has(frame.id)) continue;
     visited.add(frame.id);
 
+    // Always discover next frames, regardless of export success
+    const nextFrames = getPrototypeDestinations(frame);
+    queue.push(...nextFrames);
+
     try {
-      // Export frame as PNG
+      // Export frame as PNG — cap scale to avoid huge exports
+      const scale = Math.min(calculateScale(frame, targetRes), 4);
+      console.log('Exporting frame:', frame.name, 'scale:', scale, 'size:', frame.width, 'x', frame.height);
+      
       const imageData = await frame.exportAsync({
         format: 'PNG',
-        constraint: { type: 'SCALE', value: calculateScale(frame, targetRes) }
+        constraint: { type: 'SCALE', value: scale }
       });
 
       frames.push({
         nodeId: frame.id,
         nodeName: frame.name,
         imageData,
-        width: Math.round(frame.width * calculateScale(frame, targetRes)),
-        height: Math.round(frame.height * calculateScale(frame, targetRes))
+        width: Math.round(frame.width * scale),
+        height: Math.round(frame.height * scale)
       });
-
-      // Find next frames in prototype flow
-      const nextFrames = getPrototypeDestinations(frame);
-      queue.push(...nextFrames);
 
       // Update progress
       figma.ui.postMessage({
@@ -315,8 +320,8 @@ async function capturePrototypeFrames(
         }
       });
 
-    } catch (error) {
-      console.error(`Failed to export frame ${frame.name}:`, error);
+    } catch (_e) {
+      console.error('Failed to export frame ' + frame.name + ':', _e);
     }
   }
 
@@ -386,6 +391,7 @@ function getPrototypeDestinations(frame: FrameNode): FrameNode[] {
   
   function findDestinations(node: SceneNode) {
     if ('reactions' in node && node.reactions) {
+      console.log('Node', node.name, 'has', node.reactions.length, 'reactions:', JSON.stringify(node.reactions.map((r: any) => ({ action: r.action?.type, actions: r.actions?.map((a: any) => a?.type), destinationId: r.action?.destinationId }))));
       for (const reaction of node.reactions) {
         // New API: reaction.actions (array)
         if ('actions' in reaction && Array.isArray((reaction as any).actions)) {

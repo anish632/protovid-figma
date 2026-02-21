@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "gifenc": "^1.0.3",
-    "mp4-muxer": "^5.2.2",
     "preact": "^10.19.3"
   }
 }
