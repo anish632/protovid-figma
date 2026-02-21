@@ -290,7 +290,7 @@ async function capturePrototypeFrames(
     visited.add(frame.id);
 
     // Always discover next frames, regardless of export success
-    const nextFrames = getPrototypeDestinations(frame);
+    const nextFrames = await getPrototypeDestinations(frame);
     queue.push(...nextFrames);
 
     try {
@@ -376,20 +376,20 @@ function findPrototypeStartFrame(): FrameNode | null {
 }
 
 // Helper: Get prototype destination frames
-function getPrototypeDestinations(frame: FrameNode): FrameNode[] {
+async function getPrototypeDestinations(frame: FrameNode): Promise<FrameNode[]> {
   const destinations: FrameNode[] = [];
   const seen = new Set<string>();
   
-  function addDestination(destinationId: string | null | undefined) {
+  async function addDestination(destinationId: string | null | undefined) {
     if (!destinationId || seen.has(destinationId)) return;
     seen.add(destinationId);
-    const destNode = figma.getNodeById(destinationId);
+    const destNode = await figma.getNodeByIdAsync(destinationId);
     if (destNode && destNode.type === 'FRAME') {
       destinations.push(destNode as FrameNode);
     }
   }
   
-  function findDestinations(node: SceneNode) {
+  async function findDestinations(node: SceneNode) {
     if ('reactions' in node && node.reactions) {
       console.log('Node', node.name, 'has', node.reactions.length, 'reactions:', JSON.stringify(node.reactions.map((r: any) => ({ action: r.action?.type, actions: r.actions?.map((a: any) => a?.type), destinationId: r.action?.destinationId }))));
       for (const reaction of node.reactions) {
@@ -397,23 +397,25 @@ function getPrototypeDestinations(frame: FrameNode): FrameNode[] {
         if ('actions' in reaction && Array.isArray((reaction as any).actions)) {
           for (const action of (reaction as any).actions) {
             if (action && action.type === 'NODE') {
-              addDestination(action.destinationId);
+              await addDestination(action.destinationId);
             }
           }
         }
         // Old API: reaction.action (singular)
         if (reaction.action && reaction.action.type === 'NODE') {
-          addDestination((reaction.action as any).destinationId);
+          await addDestination((reaction.action as any).destinationId);
         }
       }
     }
     
     if ('children' in node) {
-      node.children.forEach(findDestinations);
+      for (const child of node.children) {
+        await findDestinations(child);
+      }
     }
   }
   
-  findDestinations(frame);
+  await findDestinations(frame);
   return destinations;
 }
 
