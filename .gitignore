@@ -7,3 +7,4 @@ dist/
 .vercel
 
 backend/.next/
+backend/tsconfig.tsbuildinfo
