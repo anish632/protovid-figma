@@ -278,8 +278,8 @@ function App() {
                     >
                       Validate License
                     </button>
-                    <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">
-                      Get Premium ($12/mo) →
+                    <a href="https://protovid.app/pricing" target="_blank" class="link">
+                      Get Premium ($8/mo) →
                     </a>
                   </>
                 )}
@@ -323,7 +323,7 @@ function App() {
           {!state.isPremium && (
             <div class="alert alert-info">
               <p>Exports remaining: <strong>{remainingExports}</strong></p>
-              <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">
+              <a href="https://protovid.app/pricing" target="_blank" class="link">
                 Upgrade to Premium for unlimited exports →
               </a>
             </div>
@@ -340,7 +340,7 @@ function App() {
 
       <footer>
         <p class="small">
-          ProtoVid by <a href="https://dasgroup.lemonsqueezy.com" target="_blank" class="link">Das Group</a>
+          ProtoVid by <a href="https://protovid.app" target="_blank" class="link">Das Group</a>
         </p>
       </footer>
     </div>
