@@ -51,11 +51,12 @@ export async function POST(request: NextRequest) {
         }
 
         const isActive = ['active', 'trialing'].includes(subscription.status);
+        const periodEnd = (subscription as any).current_period_end;
         setSubscription(existing.email, {
           tier: isActive ? 'pro' : 'free',
           status: subscription.status as any,
           stripeSubscriptionId: subscription.id,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+          currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
         });
         break;
       }
@@ -96,10 +97,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
-
-// Disable body parsing for webhook
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

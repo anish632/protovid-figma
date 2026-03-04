@@ -33,18 +33,18 @@ export function setSubscription(email: string, data: Partial<ReturnType<typeof g
 }
 
 export function findSubscriptionByCustomerId(customerId: string) {
-  for (const [email, sub] of subscriptions.entries()) {
+  for (const [, sub] of subscriptions.entries()) {
     if (sub.stripeCustomerId === customerId) {
-      return { email, ...sub };
+      return sub;
     }
   }
   return null;
 }
 
 export function findSubscriptionBySubscriptionId(subscriptionId: string) {
-  for (const [email, sub] of subscriptions.entries()) {
+  for (const [, sub] of subscriptions.entries()) {
     if (sub.stripeSubscriptionId === subscriptionId) {
-      return { email, ...sub };
+      return sub;
     }
   }
   return null;

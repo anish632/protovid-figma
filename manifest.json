@@ -8,10 +8,10 @@
   "documentAccess": "dynamic-page",
   "networkAccess": {
     "allowedDomains": [
-      "https://api.lemonsqueezy.com",
+      "https://api.stripe.com",
       "https://backend-one-nu-28.vercel.app"
     ],
-    "reasoning": "License key validation via Lemon Squeezy and video encoding via backend API"
+    "reasoning": "License validation via Stripe subscriptions and video encoding via backend API"
   },
   "capabilities": [],
   "enableProposedApi": false
