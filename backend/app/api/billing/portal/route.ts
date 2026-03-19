@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 });
     }
 
-    const subscription = getSubscription(email);
+    const subscription = await getSubscription(email);
 
     if (!subscription.stripeCustomerId) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 404 });

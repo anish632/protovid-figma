@@ -1,65 +1,176 @@
 /**
- * WARNING: In-memory storage — all data is lost on every Vercel cold start or redeploy.
- * Before going to production, replace with a persistent store (Vercel KV, Supabase, etc.).
+ * ProtoVid Subscription Storage - Postgres Edition
+ * Persistent storage using Neon Postgres (shared instance with RecurringTasks + ResolveAI)
+ * Table: protovid_subscriptions
  */
 
-// In-memory store: email -> subscription data
-const subscriptions = new Map<string, {
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.NEON_DATABASE_URL!);
+
+export interface Subscription {
   email: string;
   tier: 'free' | 'pro';
-  status: 'active' | 'canceled' | 'past_due';
+  status: 'active' | 'canceled' | 'past_due' | 'trialing';
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   currentPeriodEnd?: string;
   exportsThisMonth: number;
   lastResetMonth: string;
-}>();
+}
 
-export function getSubscription(email: string) {
+export async function getSubscription(email: string): Promise<Subscription> {
   const normalized = email.toLowerCase().trim();
-  return subscriptions.get(normalized) || {
-    email: normalized,
-    tier: 'free' as const,
-    status: 'active' as const,
-    exportsThisMonth: 0,
-    lastResetMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+  
+  const result = await sql`
+    SELECT 
+      email,
+      tier,
+      status,
+      stripe_customer_id as "stripeCustomerId",
+      stripe_subscription_id as "stripeSubscriptionId",
+      current_period_end as "currentPeriodEnd",
+      exports_this_month as "exportsThisMonth",
+      last_reset_month as "lastResetMonth"
+    FROM protovid_subscriptions
+    WHERE email = ${normalized}
+  `;
+  
+  if (result.length === 0) {
+    // Return default free tier subscription
+    return {
+      email: normalized,
+      tier: 'free',
+      status: 'active',
+      exportsThisMonth: 0,
+      lastResetMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+    };
+  }
+  
+  const row = result[0];
+  return {
+    email: row.email,
+    tier: row.tier as 'free' | 'pro',
+    status: row.status as any,
+    stripeCustomerId: row.stripeCustomerId || undefined,
+    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
+    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
+    exportsThisMonth: row.exportsThisMonth,
+    lastResetMonth: row.lastResetMonth,
   };
 }
 
-export function setSubscription(email: string, data: Partial<ReturnType<typeof getSubscription>>) {
+export async function setSubscription(email: string, data: Partial<Subscription>): Promise<void> {
   const normalized = email.toLowerCase().trim();
-  const existing = getSubscription(normalized);
-  subscriptions.set(normalized, { ...existing, ...data });
+  const existing = await getSubscription(normalized);
+  const merged = { ...existing, ...data };
+  
+  await sql`
+    INSERT INTO protovid_subscriptions (
+      email,
+      tier,
+      status,
+      stripe_customer_id,
+      stripe_subscription_id,
+      current_period_end,
+      exports_this_month,
+      last_reset_month,
+      updated_at
+    ) VALUES (
+      ${merged.email},
+      ${merged.tier},
+      ${merged.status},
+      ${merged.stripeCustomerId || null},
+      ${merged.stripeSubscriptionId || null},
+      ${merged.currentPeriodEnd ? new Date(merged.currentPeriodEnd) : null},
+      ${merged.exportsThisMonth},
+      ${merged.lastResetMonth},
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (email) DO UPDATE SET
+      tier = EXCLUDED.tier,
+      status = EXCLUDED.status,
+      stripe_customer_id = EXCLUDED.stripe_customer_id,
+      stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+      current_period_end = EXCLUDED.current_period_end,
+      exports_this_month = EXCLUDED.exports_this_month,
+      last_reset_month = EXCLUDED.last_reset_month,
+      updated_at = CURRENT_TIMESTAMP
+  `;
 }
 
-export function findSubscriptionByCustomerId(customerId: string) {
-  for (const [, sub] of subscriptions.entries()) {
-    if (sub.stripeCustomerId === customerId) {
-      return sub;
-    }
-  }
-  return null;
+export async function findSubscriptionByCustomerId(customerId: string): Promise<Subscription | null> {
+  const result = await sql`
+    SELECT 
+      email,
+      tier,
+      status,
+      stripe_customer_id as "stripeCustomerId",
+      stripe_subscription_id as "stripeSubscriptionId",
+      current_period_end as "currentPeriodEnd",
+      exports_this_month as "exportsThisMonth",
+      last_reset_month as "lastResetMonth"
+    FROM protovid_subscriptions
+    WHERE stripe_customer_id = ${customerId}
+  `;
+  
+  if (result.length === 0) return null;
+  
+  const row = result[0];
+  return {
+    email: row.email,
+    tier: row.tier as 'free' | 'pro',
+    status: row.status as any,
+    stripeCustomerId: row.stripeCustomerId || undefined,
+    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
+    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
+    exportsThisMonth: row.exportsThisMonth,
+    lastResetMonth: row.lastResetMonth,
+  };
 }
 
-export function findSubscriptionBySubscriptionId(subscriptionId: string) {
-  for (const [, sub] of subscriptions.entries()) {
-    if (sub.stripeSubscriptionId === subscriptionId) {
-      return sub;
-    }
-  }
-  return null;
+export async function findSubscriptionBySubscriptionId(subscriptionId: string): Promise<Subscription | null> {
+  const result = await sql`
+    SELECT 
+      email,
+      tier,
+      status,
+      stripe_customer_id as "stripeCustomerId",
+      stripe_subscription_id as "stripeSubscriptionId",
+      current_period_end as "currentPeriodEnd",
+      exports_this_month as "exportsThisMonth",
+      last_reset_month as "lastResetMonth"
+    FROM protovid_subscriptions
+    WHERE stripe_subscription_id = ${subscriptionId}
+  `;
+  
+  if (result.length === 0) return null;
+  
+  const row = result[0];
+  return {
+    email: row.email,
+    tier: row.tier as 'free' | 'pro',
+    status: row.status as any,
+    stripeCustomerId: row.stripeCustomerId || undefined,
+    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
+    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
+    exportsThisMonth: row.exportsThisMonth,
+    lastResetMonth: row.lastResetMonth,
+  };
 }
 
-export function incrementExportCount(email: string) {
-  const sub = getSubscription(email);
+export async function incrementExportCount(email: string): Promise<Subscription> {
+  const sub = await getSubscription(email);
   const currentMonth = new Date().toISOString().slice(0, 7);
   
+  // Reset exports if new month
   if (sub.lastResetMonth !== currentMonth) {
     sub.exportsThisMonth = 0;
     sub.lastResetMonth = currentMonth;
   }
   
   sub.exportsThisMonth += 1;
-  setSubscription(email, sub);
+  await setSubscription(email, sub);
+  
   return sub;
 }

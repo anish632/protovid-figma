@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const subscription = getSubscription(email);
+    const subscription = await getSubscription(email);
 
     // Check if user has active pro subscription
     const isActive = subscription.tier === 'pro' && 

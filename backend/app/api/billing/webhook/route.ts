@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        setSubscription(email, {
+        await setSubscription(email, {
           tier: 'pro',
           status: 'active',
           stripeCustomerId: session.customer as string,
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        const existing = findSubscriptionByCustomerId(customerId);
+        const existing = await findSubscriptionByCustomerId(customerId);
         if (!existing) {
           console.warn('No subscription found for customer:', customerId);
           break;
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
         const isActive = ['active', 'trialing'].includes(subscription.status);
         const periodEnd = (subscription as any).current_period_end;
-        setSubscription(existing.email, {
+        await setSubscription(existing.email, {
           tier: isActive ? 'pro' : 'free',
           status: subscription.status as any,
           stripeSubscriptionId: subscription.id,
@@ -64,13 +64,13 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
         
-        const existing = findSubscriptionBySubscriptionId(subscription.id);
+        const existing = await findSubscriptionBySubscriptionId(subscription.id);
         if (!existing) {
           console.warn('No subscription found for ID:', subscription.id);
           break;
         }
 
-        setSubscription(existing.email, {
+        await setSubscription(existing.email, {
           tier: 'free',
           status: 'canceled',
         });
@@ -81,9 +81,9 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        const existing = findSubscriptionByCustomerId(customerId);
+        const existing = await findSubscriptionByCustomerId(customerId);
         if (existing) {
-          setSubscription(existing.email, {
+          await setSubscription(existing.email, {
             status: 'past_due',
           });
         }
