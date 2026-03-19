@@ -92,6 +92,10 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
       case 'encoding-complete':
         await handleEncodingComplete(msg.data?.isPremium ?? false);
         break;
+      
+      case 'open-checkout':
+        await handleOpenCheckout(msg.data.email);
+        break;
 
       default:
         console.log('Unknown message type:', msg.type);
@@ -233,6 +237,33 @@ async function handleValidateLicense(licenseKey: string) {
     type: 'license-validated',
     data: { isValid, licenseKey }
   });
+}
+
+async function handleOpenCheckout(email: string) {
+  try {
+    const response = await fetch('https://backend-one-nu-28.vercel.app/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.url) {
+        // Open Stripe checkout in browser
+        figma.openExternal(data.url);
+        figma.notify('Opening checkout... Complete payment and return to validate your license with your email.');
+      } else {
+        figma.notify('Failed to create checkout session. Please try again.');
+      }
+    } else {
+      const error = await response.json();
+      figma.notify(error.error || 'Failed to open checkout. Please try again.');
+    }
+  } catch (error) {
+    console.error('Checkout error:', error);
+    figma.notify('Network error. Please check your connection and try again.');
+  }
 }
 
 async function validateLicense(licenseKey?: string): Promise<boolean> {

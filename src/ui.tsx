@@ -185,6 +185,20 @@ function App() {
     }
   };
 
+  const handleOpenCheckout = () => {
+    const email = state.licenseKey.trim();
+    if (!email || !email.includes('@')) {
+      setState(prev => ({ ...prev, error: 'Please enter your email address to proceed to checkout' }));
+      return;
+    }
+    parent.postMessage({
+      pluginMessage: {
+        type: 'open-checkout',
+        data: { email }
+      }
+    }, '*');
+  };
+
   const updateSettings = (key: string, value: any) => {
     setState(prev => ({
       ...prev,
@@ -265,22 +279,29 @@ function App() {
                       <p class="small">720p only</p>
                     </div>
                     <input
-                      type="text"
-                      placeholder="Enter premium license key..."
+                      type="email"
+                      placeholder="Enter your email address..."
                       value={state.licenseKey}
                       onInput={(e) => setState(prev => ({ ...prev, licenseKey: e.currentTarget.value }))}
                       class="license-input"
                     />
-                    <button
-                      onClick={handleValidateLicense}
-                      disabled={!state.licenseKey.trim()}
-                      class="btn btn-secondary btn-small"
-                    >
-                      Validate License
-                    </button>
-                    <a href="https://protovid.app/pricing" target="_blank" class="link">
-                      Get Premium ($8/mo) →
-                    </a>
+                    <div style="display: flex; gap: 8px; flex-direction: column;">
+                      <button
+                        onClick={handleOpenCheckout}
+                        disabled={!state.licenseKey.trim()}
+                        class="btn btn-primary btn-small"
+                      >
+                        🛒 Get Premium ($8/mo)
+                      </button>
+                      <button
+                        onClick={handleValidateLicense}
+                        disabled={!state.licenseKey.trim()}
+                        class="btn btn-secondary btn-small"
+                      >
+                        ✅ Already paid? Validate License
+                      </button>
+                    </div>
+                    <p class="small" style="margin-top: 8px; color: #666;">Enter email → Complete payment → Return here and validate</p>
                   </>
                 )}
               </div>
@@ -323,9 +344,14 @@ function App() {
           {!state.isPremium && (
             <div class="alert alert-info">
               <p>Exports remaining: <strong>{remainingExports}</strong></p>
-              <a href="https://protovid.app/pricing" target="_blank" class="link">
-                Upgrade to Premium for unlimited exports →
-              </a>
+              <p class="small">Want unlimited exports + HD quality?</p>
+              <button
+                onClick={() => setState(prev => ({ ...prev, stage: 'setup' }))}
+                class="btn btn-primary btn-small"
+                style="margin-top: 8px;"
+              >
+                🛒 Upgrade to Premium ($8/mo)
+              </button>
             </div>
           )}
 
