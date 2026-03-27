@@ -15,32 +15,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
+import { withRateLimit, generalRateLimit } from '@/lib/rateLimit';
 
 const sql = neon(process.env.NEON_DATABASE_URL!);
 const FREE_LIMIT = 1;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+  return NextResponse.json({}, { status: 200 });
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
-    const { email } = await request.json();
-
-    if (!email || !email.includes('@')) {
-      return NextResponse.json(
-        { canExport: false, error: 'Valid email required' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
+    const body = await request.json();
+    const { email } = exportCheckRequestSchema.parse(body);
+    const normalizedEmail = email;
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
     // Check if user has active premium subscription
@@ -56,8 +45,7 @@ export async function POST(request: NextRequest) {
 
     if (isPremium) {
       return NextResponse.json(
-        { canExport: true, exportsThisMonth: 0, limit: 999, isPremium: true },
-        { headers: corsHeaders }
+        { canExport: true, exportsThisMonth: 0, limit: 999, isPremium: true }
       );
     }
 
@@ -70,20 +58,22 @@ export async function POST(request: NextRequest) {
 
     const exportsThisMonth = countResult.length > 0 ? parseInt(countResult[0].count) : 0;
 
-    return NextResponse.json(
-      {
-        canExport: exportsThisMonth < FREE_LIMIT,
-        exportsThisMonth,
-        limit: FREE_LIMIT,
-        isPremium: false,
-      },
-      { headers: corsHeaders }
-    );
+    return NextResponse.json({
+      canExport: exportsThisMonth < FREE_LIMIT,
+      exportsThisMonth,
+      limit: FREE_LIMIT,
+      isPremium: false,
+    });
   } catch (error) {
     console.error('Export check error:', error);
-    return NextResponse.json(
-      { canExport: true, exportsThisMonth: 0, limit: FREE_LIMIT, isPremium: false, error: 'Server error, allowing export' },
-      { headers: corsHeaders }
-    );
+    return NextResponse.json({
+      canExport: true, 
+      exportsThisMonth: 0, 
+      limit: FREE_LIMIT, 
+      isPremium: false, 
+      error: sanitizeError(error)
+    });
   }
 }
+
+export const POST = withRateLimit(generalRateLimit, handlePOST);

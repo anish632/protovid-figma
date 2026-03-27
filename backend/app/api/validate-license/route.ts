@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ valid: false }, { status: 400 });
     }
 
-    // Development mode - accept test keys (keep for backward compatibility)
-    if (licenseKey.startsWith('DEV_') || licenseKey.startsWith('PREMIUM_')) {
+    // Development mode - accept test keys only in non-production
+    if (process.env.NODE_ENV !== 'production' && (licenseKey.startsWith('DEV_') || licenseKey.startsWith('PREMIUM_'))) {
       return NextResponse.json({
         valid: true,
         status: 'active',
