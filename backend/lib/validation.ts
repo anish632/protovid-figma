@@ -74,12 +74,15 @@ export function sanitizeError(error: unknown): string {
 }
 
 // Validate and sanitize metadata objects
-export const metadataSchema = z.record(z.union([
+export const metadataSchema = z.record(
   z.string(),
-  z.number(),
-  z.boolean(),
-  z.null()
-])).optional();
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null()
+  ])
+).optional();
 
 // Request validation schemas
 export const trackingRequestSchema = z.object({

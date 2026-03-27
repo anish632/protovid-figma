@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
 
 export async function OPTIONS() {
   return NextResponse.json({}, { 
@@ -16,6 +21,7 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
+    const sql = getDB();
     const { email, eventType, pluginVersion, metadata } = await request.json();
 
     if (!eventType) {

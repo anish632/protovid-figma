@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+// Lazy initialize DB connection
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
 
-// Simple API key protection
-const STATS_API_KEY = process.env.STATS_API_KEY || 'protovid_stats_key_2026';
+// API key protection - must be set in production
+const STATS_API_KEY = process.env.STATS_API_KEY;
 
 export async function GET(request: NextRequest) {
   try {
+    const sql = getDB();
     // Check API key
     const apiKey = request.headers.get('x-api-key') || request.nextUrl.searchParams.get('key');
     if (apiKey !== STATS_API_KEY) {

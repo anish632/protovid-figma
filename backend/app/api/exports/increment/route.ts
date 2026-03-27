@@ -6,7 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +25,7 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
+    const sql = getDB();
     const { email } = await request.json();
 
     if (!email || !email.includes('@')) {

@@ -18,7 +18,13 @@ import { neon } from '@neondatabase/serverless';
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 import { withRateLimit, generalRateLimit } from '@/lib/rateLimit';
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
+
 const FREE_LIMIT = 1;
 
 export async function OPTIONS() {
@@ -27,6 +33,7 @@ export async function OPTIONS() {
 
 async function handlePOST(request: NextRequest) {
   try {
+    const sql = getDB();
     const body = await request.json();
     const { email } = exportCheckRequestSchema.parse(body);
     const normalizedEmail = email;

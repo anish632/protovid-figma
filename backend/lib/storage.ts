@@ -6,7 +6,12 @@
 
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
 
 export interface Subscription {
   email: string;
@@ -20,6 +25,8 @@ export interface Subscription {
 }
 
 export async function getSubscription(email: string): Promise<Subscription> {
+  const sql = getDB();
+  const sql = getDB();
   const normalized = email.toLowerCase().trim();
   
   const result = await sql`
@@ -61,6 +68,7 @@ export async function getSubscription(email: string): Promise<Subscription> {
 }
 
 export async function setSubscription(email: string, data: Partial<Subscription>): Promise<void> {
+  const sql = getDB();
   const normalized = email.toLowerCase().trim();
   const existing = await getSubscription(normalized);
   const merged = { ...existing, ...data };
@@ -100,6 +108,7 @@ export async function setSubscription(email: string, data: Partial<Subscription>
 }
 
 export async function findSubscriptionByCustomerId(customerId: string): Promise<Subscription | null> {
+  const sql = getDB();
   const result = await sql`
     SELECT 
       email,
@@ -130,6 +139,7 @@ export async function findSubscriptionByCustomerId(customerId: string): Promise<
 }
 
 export async function findSubscriptionBySubscriptionId(subscriptionId: string): Promise<Subscription | null> {
+  const sql = getDB();
   const result = await sql`
     SELECT 
       email,
@@ -160,6 +170,7 @@ export async function findSubscriptionBySubscriptionId(subscriptionId: string): 
 }
 
 export async function incrementExportCount(email: string): Promise<Subscription> {
+  const sql = getDB();
   const sub = await getSubscription(email);
   const currentMonth = new Date().toISOString().slice(0, 7);
   
