@@ -24,8 +24,75 @@ let currentSettings: ExportSettings = {
   showCursor: true
 };
 
-let exportCount = 0; // Track free tier usage
-const FREE_TIER_LIMIT = 3;
+let exportCount = 0;
+const FREE_TIER_LIMIT = 1; // Changed from 3 → 1
+const PLUGIN_VERSION = '1.0.0';
+const BACKEND_URL = 'https://backend-one-nu-28.vercel.app';
+
+// ---- Email persistence ----
+async function loadEmail(): Promise<string | null> {
+  try {
+    return await figma.clientStorage.getAsync('userEmail') || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function saveEmail(email: string) {
+  try {
+    await figma.clientStorage.setAsync('userEmail', email);
+  } catch (e) {
+    console.error('Failed to save email:', e);
+  }
+}
+
+// ---- Usage tracking ----
+async function trackEvent(eventType: string, metadata?: any) {
+  try {
+    const email = await loadEmail();
+    await fetch(`${BACKEND_URL}/api/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        eventType,
+        pluginVersion: PLUGIN_VERSION,
+        metadata
+      })
+    });
+  } catch (e) {
+    console.error('Tracking error:', e);
+  }
+}
+
+// ---- Server-side export check ----
+async function checkServerExports(email: string): Promise<{ canExport: boolean; exportsThisMonth: number; limit: number; isPremium: boolean } | null> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/exports/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch (_e) {
+    return null; // Server unreachable, will fall back to clientStorage
+  }
+}
+
+async function incrementServerExports(email: string) {
+  try {
+    await fetch(`${BACKEND_URL}/api/exports/increment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+  } catch (_e) {
+    // Fail silently
+  }
+}
 
 // Persist export count across plugin sessions using clientStorage
 async function loadExportCount(): Promise<number> {
@@ -65,6 +132,9 @@ async function saveLicenseKey(key: string) {
 // Initialize plugin
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
+// Track plugin load
+trackEvent('plugin_load');
+
 // Message handler
 figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
   try {
@@ -97,6 +167,10 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
         await handleOpenCheckout(msg.data.email);
         break;
 
+      case 'save-email':
+        await handleSaveEmail(msg.data.email);
+        break;
+
       default:
         console.log('Unknown message type:', msg.type);
     }
@@ -108,14 +182,51 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
   }
 };
 
+// Handle email save from email gate
+async function handleSaveEmail(email: string) {
+  const normalized = email.toLowerCase().trim();
+  await saveEmail(normalized);
+  // Also save as license key for validation
+  await saveLicenseKey(normalized);
+  trackEvent('email_captured', { email: normalized });
+
+  // Check server-side export status
+  const serverStatus = await checkServerExports(normalized);
+  if (serverStatus) {
+    exportCount = serverStatus.exportsThisMonth;
+    await saveExportCount(exportCount);
+  }
+
+  figma.ui.postMessage({
+    type: 'email-saved',
+    data: {
+      email: normalized,
+      exportCount,
+      freeLimit: FREE_TIER_LIMIT,
+      isPremium: serverStatus?.isPremium ?? false
+    }
+  });
+}
+
 // Initialize plugin state
 async function handleInit() {
-  // Load persisted state
   exportCount = await loadExportCount();
   const savedKey = await loadLicenseKey();
+  const savedEmail = await loadEmail();
 
   // Build graph to count ALL prototype-connected frames (sources + destinations)
   const { allFrameIds } = await buildPrototypeGraph();
+
+  // If we have an email, check server for export count
+  let serverPremium = false;
+  if (savedEmail) {
+    const serverStatus = await checkServerExports(savedEmail);
+    if (serverStatus) {
+      exportCount = serverStatus.exportsThisMonth;
+      await saveExportCount(exportCount);
+      serverPremium = serverStatus.isPremium;
+    }
+  }
 
   figma.ui.postMessage({
     type: 'init-complete',
@@ -124,9 +235,23 @@ async function handleInit() {
       frameCount: allFrameIds.size,
       exportCount,
       freeLimit: FREE_TIER_LIMIT,
-      savedLicenseKey: savedKey
+      savedLicenseKey: savedKey,
+      savedEmail,
+      isPremium: serverPremium
     }
   });
+
+  // Auto-validate saved license key
+  if (savedKey || savedEmail) {
+    const keyToValidate = savedKey || savedEmail;
+    const isValid = await validateLicense(keyToValidate!);
+    if (isValid) {
+      figma.ui.postMessage({
+        type: 'license-validated',
+        data: { isValid: true, licenseKey: keyToValidate }
+      });
+    }
+  }
 }
 
 // Scan for prototype flows
@@ -158,15 +283,43 @@ async function handleScanPrototype() {
 async function handleExportVideo(settings: ExportSettings) {
   currentSettings = settings;
 
+  const email = await loadEmail();
+
+  // Track export attempt
+  trackEvent('export', {
+    resolution: settings.resolution,
+    frameRate: settings.frameRate,
+    hasLicense: !!settings.licenseKey
+  });
+
   // Check license for premium features
-  const isPremium = await validateLicense(settings.licenseKey);
+  const isPremium = await validateLicense(settings.licenseKey || email || undefined);
   
   if (!isPremium) {
-    // Free tier restrictions
-    if (exportCount >= FREE_TIER_LIMIT) {
+    // Server-side check first, fall back to clientStorage
+    let canExport = true;
+    if (email) {
+      const serverStatus = await checkServerExports(email);
+      if (serverStatus) {
+        exportCount = serverStatus.exportsThisMonth;
+        await saveExportCount(exportCount);
+        canExport = serverStatus.canExport;
+      } else {
+        // Server unreachable, use clientStorage
+        canExport = exportCount < FREE_TIER_LIMIT;
+      }
+    } else {
+      canExport = exportCount < FREE_TIER_LIMIT;
+    }
+
+    if (!canExport) {
       figma.ui.postMessage({
         type: 'error',
-        data: { message: 'Free tier limit reached. Upgrade to Premium for unlimited exports.' }
+        data: { message: 'Free export used this month. Upgrade to Premium for unlimited exports.' }
+      });
+      figma.ui.postMessage({
+        type: 'export-count-updated',
+        data: { exportCount }
       });
       return;
     }
@@ -178,8 +331,6 @@ async function handleExportVideo(settings: ExportSettings) {
       });
       return;
     }
-
-    // Format is always MP4
   }
 
   figma.ui.postMessage({
@@ -222,10 +373,9 @@ async function handleExportVideo(settings: ExportSettings) {
       isPremium
     }
   });
-  // Export count is incremented when UI sends 'encoding-complete' back
 }
 
-// Validate Lemon Squeezy license key
+// Validate license
 async function handleValidateLicense(licenseKey: string) {
   const isValid = await validateLicense(licenseKey);
   
@@ -241,7 +391,13 @@ async function handleValidateLicense(licenseKey: string) {
 
 async function handleOpenCheckout(email: string) {
   try {
-    const response = await fetch('https://backend-one-nu-28.vercel.app/api/billing/checkout', {
+    trackEvent('checkout_start', { email });
+    
+    // Save email for auto-polling after checkout
+    await saveEmail(email.toLowerCase().trim());
+    await saveLicenseKey(email.toLowerCase().trim());
+
+    const response = await fetch(`${BACKEND_URL}/api/billing/checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -250,9 +406,13 @@ async function handleOpenCheckout(email: string) {
     if (response.ok) {
       const data = await response.json();
       if (data.url) {
-        // Open Stripe checkout in browser
         figma.openExternal(data.url);
-        figma.notify('Opening checkout... Complete payment and return to validate your license with your email.');
+        figma.notify('Opening checkout... We\'ll check your payment status automatically when you return.');
+        // Tell UI to start polling
+        figma.ui.postMessage({
+          type: 'checkout-opened',
+          data: { email: email.toLowerCase().trim() }
+        });
       } else {
         figma.notify('Failed to create checkout session. Please try again.');
       }
@@ -270,7 +430,7 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
   if (!licenseKey) return false;
 
   try {
-    const response = await fetch('https://backend-one-nu-28.vercel.app/api/validate-license', {
+    const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ licenseKey })
@@ -279,7 +439,6 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
       const data = await response.json();
       return data.valid === true;
     }
-
     return false;
   } catch (error) {
     console.error('License validation error:', error);
@@ -287,15 +446,32 @@ async function validateLicense(licenseKey?: string): Promise<boolean> {
   }
 }
 
+// Handle encoding completion from UI
+async function handleEncodingComplete(isPremium: boolean) {
+  if (!isPremium) {
+    exportCount++;
+    await saveExportCount(exportCount);
+    
+    // Increment server-side count
+    const email = await loadEmail();
+    if (email) {
+      await incrementServerExports(email);
+    }
+  }
+  figma.ui.postMessage({
+    type: 'export-count-updated',
+    data: { exportCount }
+  });
+}
+
 // Helper: Check if a node type can be exported as a prototype frame
 function isExportableFrame(node: BaseNode): boolean {
   return node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET';
 }
 
-// Helper: Extract destination node IDs from a reaction (handles both current and deprecated APIs)
+// Helper: Extract destination node IDs from a reaction
 function extractDestinationIds(reaction: any): string[] {
   const ids: string[] = [];
-  // Current API: reaction.actions (array)
   if (Array.isArray(reaction.actions)) {
     for (const action of reaction.actions) {
       if (action && action.type === 'NODE' && action.destinationId) {
@@ -303,15 +479,13 @@ function extractDestinationIds(reaction: any): string[] {
       }
     }
   }
-  // Deprecated API: reaction.action (singular)
   if (reaction.action && reaction.action.type === 'NODE' && reaction.action.destinationId) {
     ids.push(reaction.action.destinationId);
   }
   return ids;
 }
 
-// Build a global map of prototype connections by walking ALL nodes on the page.
-// Uses getNodeByIdAsync (required for dynamic-page documentAccess).
+// Build prototype graph
 async function buildPrototypeGraph(): Promise<{
   edges: Map<string, Set<string>>;
   allFrameIds: Set<string>;
@@ -345,7 +519,6 @@ async function buildPrototypeGraph(): Promise<{
     }
   }
 
-  // Add source frames (those with outgoing edges) to allFrameIds
   for (const sourceId of edges.keys()) {
     allFrameIds.add(sourceId);
   }
@@ -353,7 +526,7 @@ async function buildPrototypeGraph(): Promise<{
   return { edges, allFrameIds };
 }
 
-// Capture frames from prototype flow using global graph
+// Capture frames from prototype flow
 async function capturePrototypeFrames(
   startFrame: FrameNode,
   settings: ExportSettings
@@ -403,7 +576,6 @@ async function capturePrototypeFrames(
     }
   }
 
-  // BFS through prototype graph
   while (queue.length > 0) {
     const frameId = queue.shift()!;
     if (visited.has(frameId)) continue;
@@ -419,7 +591,6 @@ async function capturePrototypeFrames(
     await exportFrame(frameId);
   }
 
-  // Fallback: capture any prototype-connected frames missed by BFS
   for (const frameId of allFrameIds) {
     if (visited.has(frameId)) continue;
     visited.add(frameId);
@@ -429,26 +600,12 @@ async function capturePrototypeFrames(
   return frames;
 }
 
-// Calculate scale factor for target resolution
 function calculateScale(frame: FrameNode, targetRes: { width: number; height: number }): number {
   const scaleX = targetRes.width / frame.width;
   const scaleY = targetRes.height / frame.height;
   return Math.min(scaleX, scaleY);
 }
 
-// Handle encoding completion from UI
-async function handleEncodingComplete(isPremium: boolean) {
-  if (!isPremium) {
-    exportCount++;
-    await saveExportCount(exportCount);
-  }
-  figma.ui.postMessage({
-    type: 'export-count-updated',
-    data: { exportCount }
-  });
-}
-
-// Helper: Check if node has prototype interactions
 function hasPrototypeInteractions(node: SceneNode): boolean {
   if ('reactions' in node && node.reactions && node.reactions.length > 0) {
     for (const reaction of node.reactions) {
@@ -461,9 +618,7 @@ function hasPrototypeInteractions(node: SceneNode): boolean {
   return false;
 }
 
-// Helper: Find prototype start frame using flowStartingPoints with fallback
 async function findPrototypeStartFrame(): Promise<FrameNode | null> {
-  // Try flowStartingPoints API first
   const flows = figma.currentPage.flowStartingPoints;
   if (flows && flows.length > 0) {
     for (const flow of flows) {
@@ -474,7 +629,6 @@ async function findPrototypeStartFrame(): Promise<FrameNode | null> {
     }
   }
 
-  // Fallback: first top-level frame with prototype interactions
   for (const node of figma.currentPage.children) {
     if (isExportableFrame(node) && hasPrototypeInteractions(node as SceneNode)) {
       return node as FrameNode;
@@ -483,12 +637,10 @@ async function findPrototypeStartFrame(): Promise<FrameNode | null> {
   return null;
 }
 
-// Helper: Analyze prototype flow
 function analyzePrototypeFlow(frames: any[]) {
   return {
     totalFrames: frames.length,
-    estimatedDuration: frames.length * 2, // 2 seconds per frame estimate
-    hasAnimations: true // TODO: detect actual animations
+    estimatedDuration: frames.length * 2,
+    hasAnimations: true
   };
 }
-

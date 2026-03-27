@@ -154,14 +154,39 @@ function createMJPEGAVI(
 }
 
 /**
+ * Draw a semi-transparent watermark on the canvas for free-tier users.
+ */
+function drawWatermark(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const text = 'Made with ProtoVid';
+  const fontSize = Math.max(14, Math.round(height * 0.025));
+  ctx.save();
+  ctx.font = `bold ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+
+  // Shadow for readability on any background
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
+
+  // Semi-transparent white text
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.fillText(text, width - fontSize * 0.8, height - fontSize * 0.6);
+  ctx.restore();
+}
+
+/**
  * Encode prototype frames as MJPEG AVI video.
  * Converts each PNG frame → JPEG via Canvas, then wraps in AVI container.
  * Each prototype frame is repeated to hold for FRAME_HOLD_SECONDS.
+ * Adds watermark for free-tier users.
  */
 async function encodeAVI(
   frames: FrameInput[],
   _settings: EncodeSettings,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  addWatermark: boolean = false
 ): Promise<Uint8Array> {
   const first = await loadPNG(frames[0].imageData);
   const width = first.width;
@@ -183,6 +208,11 @@ async function encodeAVI(
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(bmp, 0, 0, width, height);
     bmp.close();
+
+    // Add watermark for free-tier exports
+    if (addWatermark) {
+      drawWatermark(ctx, width, height);
+    }
 
     const jpeg = await canvasToJPEG(canvas, 0.92);
 
@@ -224,17 +254,20 @@ async function transcodeToMP4(aviData: Uint8Array): Promise<Uint8Array | null> {
  * Main entry point — encode frames to video.
  * Encodes MJPEG AVI locally, then uploads to server for MP4 transcoding.
  * Falls back to AVI download if server transcoding fails.
+ * @param isPremium - if false, adds watermark to frames
  */
 export async function encodeVideo(
   frames: FrameInput[],
   settings: EncodeSettings,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  isPremium: boolean = true
 ): Promise<{ url: string; filename: string }> {
   if (!frames.length) {
     throw new Error('No frames to encode');
   }
 
-  const aviData = await encodeAVI(frames, settings, onProgress);
+  const addWatermark = !isPremium;
+  const aviData = await encodeAVI(frames, settings, onProgress, addWatermark);
 
   // Attempt server-side transcoding to MP4
   onProgress(92);

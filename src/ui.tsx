@@ -1,16 +1,17 @@
 // ProtoVid - Plugin UI (runs in iframe)
 import { h, Fragment, render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { encodeVideo } from './encoder';
 
 interface AppState {
-  stage: 'loading' | 'setup' | 'scanning' | 'exporting' | 'complete';
+  stage: 'loading' | 'email-gate' | 'setup' | 'scanning' | 'exporting' | 'complete' | 'checking-payment';
   hasPrototype: boolean;
   frameCount: number;
   exportCount: number;
   freeLimit: number;
   isPremium: boolean;
   licenseKey: string;
+  userEmail: string;
   settings: {
     resolution: '720p' | '1080p' | '4K';
     frameRate: 30 | 60;
@@ -26,15 +27,18 @@ interface AppState {
   downloadFilename: string | null;
 }
 
+const BACKEND_URL = 'https://backend-one-nu-28.vercel.app';
+
 function App() {
   const [state, setState] = useState<AppState>({
     stage: 'loading',
     hasPrototype: false,
     frameCount: 0,
     exportCount: 0,
-    freeLimit: 3,
+    freeLimit: 1,
     isPremium: false,
     licenseKey: '',
+    userEmail: '',
     settings: {
       resolution: '720p',
       frameRate: 30,
@@ -50,6 +54,15 @@ function App() {
     downloadFilename: null
   });
 
+  const pollTimerRef = useRef<number | null>(null);
+
+  // Stop polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     // Initialize
     parent.postMessage({ pluginMessage: { type: 'init' } }, '*');
@@ -63,22 +76,27 @@ function App() {
         case 'init-complete':
           setState(prev => ({
             ...prev,
-            stage: 'setup',
+            stage: msg.data.savedEmail ? 'setup' : 'email-gate',
             hasPrototype: msg.data.hasPrototype,
             frameCount: msg.data.frameCount,
             exportCount: msg.data.exportCount,
             freeLimit: msg.data.freeLimit,
-            licenseKey: msg.data.savedLicenseKey || ''
+            licenseKey: msg.data.savedLicenseKey || msg.data.savedEmail || '',
+            userEmail: msg.data.savedEmail || '',
+            isPremium: msg.data.isPremium || false
           }));
-          // Auto-validate saved license key
-          if (msg.data.savedLicenseKey) {
-            parent.postMessage({
-              pluginMessage: {
-                type: 'validate-license',
-                data: { licenseKey: msg.data.savedLicenseKey }
-              }
-            }, '*');
-          }
+          break;
+
+        case 'email-saved':
+          setState(prev => ({
+            ...prev,
+            stage: 'setup',
+            userEmail: msg.data.email,
+            licenseKey: msg.data.email,
+            exportCount: msg.data.exportCount,
+            freeLimit: msg.data.freeLimit,
+            isPremium: msg.data.isPremium || false
+          }));
           break;
 
         case 'scan-complete':
@@ -112,7 +130,8 @@ function App() {
                   ...prev,
                   progress: { stage: 'encoding', percent }
                 }));
-              }
+              },
+              isPremium  // Pass premium flag for watermark
             );
 
             setState(prev => ({
@@ -146,8 +165,13 @@ function App() {
           setState(prev => ({
             ...prev,
             isPremium: msg.data.isValid,
-            licenseKey: msg.data.isValid ? msg.data.licenseKey : ''
+            licenseKey: msg.data.isValid ? msg.data.licenseKey : prev.licenseKey
           }));
+          break;
+
+        case 'checkout-opened':
+          // Start auto-polling for payment completion
+          startPaymentPolling(msg.data.email);
           break;
 
         case 'error':
@@ -160,6 +184,72 @@ function App() {
       }
     };
   }, []);
+
+  // Auto-poll for payment completion after checkout
+  const startPaymentPolling = (email: string) => {
+    setState(prev => ({ ...prev, stage: 'checking-payment' }));
+    
+    let attempts = 0;
+    const maxAttempts = 10; // 10 * 3s = 30s
+    
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    
+    pollTimerRef.current = window.setInterval(async () => {
+      attempts++;
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ licenseKey: email })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.valid && data.tier === 'pro') {
+            // Payment confirmed!
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+            setState(prev => ({
+              ...prev,
+              stage: 'setup',
+              isPremium: true,
+              licenseKey: email,
+              error: null
+            }));
+            // Notify plugin code to save the license
+            parent.postMessage({
+              pluginMessage: { type: 'validate-license', data: { licenseKey: email } }
+            }, '*');
+            return;
+          }
+        }
+      } catch (_e) {
+        // Network error, keep trying
+      }
+      
+      if (attempts >= maxAttempts) {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+        setState(prev => ({
+          ...prev,
+          stage: 'setup',
+          error: null
+        }));
+      }
+    }, 3000);
+  };
+
+  const handleEmailSubmit = () => {
+    const email = state.userEmail.trim();
+    if (!email || !email.includes('@')) {
+      setState(prev => ({ ...prev, error: 'Please enter a valid email address' }));
+      return;
+    }
+    parent.postMessage({
+      pluginMessage: { type: 'save-email', data: { email } }
+    }, '*');
+  };
 
   const handleExport = () => {
     setState(prev => ({ ...prev, error: null, stage: 'exporting' }));
@@ -186,7 +276,7 @@ function App() {
   };
 
   const handleOpenCheckout = () => {
-    const email = state.licenseKey.trim();
+    const email = state.userEmail || state.licenseKey.trim();
     if (!email || !email.includes('@')) {
       setState(prev => ({ ...prev, error: 'Please enter your email address to proceed to checkout' }));
       return;
@@ -208,6 +298,7 @@ function App() {
 
   const remainingExports = state.freeLimit - state.exportCount;
   const canExport = state.isPremium || remainingExports > 0;
+  const freeUsed = !state.isPremium && state.exportCount >= state.freeLimit;
 
   return (
     <div class="container">
@@ -229,6 +320,46 @@ function App() {
         </div>
       )}
 
+      {/* ===== EMAIL GATE ===== */}
+      {state.stage === 'email-gate' && (
+        <div class="setup">
+          <div class="section">
+            <div class="email-gate-icon">📧</div>
+            <h3 style="text-align: center;">Enter your email to start exporting</h3>
+            <p class="small" style="text-align: center; margin-bottom: 16px;">Free, no payment needed. We'll save your export history.</p>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={state.userEmail}
+              onInput={(e) => setState(prev => ({ ...prev, userEmail: e.currentTarget.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleEmailSubmit(); }}
+              class="license-input"
+              style="margin-bottom: 12px;"
+            />
+            <button
+              onClick={handleEmailSubmit}
+              disabled={!state.userEmail.trim() || !state.userEmail.includes('@')}
+              class="btn btn-primary btn-large"
+            >
+              Get Started — Free
+            </button>
+            <p class="small" style="text-align: center; margin-top: 12px; color: #999;">
+              1 free export per month · 720p · No credit card required
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CHECKING PAYMENT ===== */}
+      {state.stage === 'checking-payment' && (
+        <div class="loading">
+          <div class="spinner"></div>
+          <h3>Checking payment status...</h3>
+          <p class="small" style="margin-top: 8px;">Complete your payment in the browser. We'll detect it automatically.</p>
+        </div>
+      )}
+
+      {/* ===== MAIN SETUP ===== */}
       {state.stage === 'setup' && (
         <div class="setup">
           {!state.hasPrototype && (
@@ -240,6 +371,21 @@ function App() {
 
           {state.hasPrototype && (
             <>
+              {/* Free tier exhausted banner */}
+              {freeUsed && (
+                <div class="alert alert-upgrade">
+                  <p style="font-weight: 600; margin-bottom: 4px;">🚀 Free export used this month</p>
+                  <p class="small">Upgrade for unlimited HD exports, no watermark — <strong>$8/mo</strong></p>
+                  <button
+                    onClick={handleOpenCheckout}
+                    class="btn btn-primary btn-small"
+                    style="margin-top: 8px;"
+                  >
+                    Upgrade to Premium
+                  </button>
+                </div>
+              )}
+
               <div class="section">
                 <h3>📊 Prototype Info</h3>
                 <p>Found <strong>{state.frameCount}</strong> prototype frames</p>
@@ -261,22 +407,20 @@ function App() {
                   </select>
                 </label>
 
-{/* Frame rate is automatic */}
-
-                <p class="small">Output: MP4 Video</p>
+                <p class="small">Output: MP4 Video{!state.isPremium ? ' · Watermarked' : ''}</p>
               </div>
 
               <div class="section">
                 <h3>🔑 License</h3>
                 {state.isPremium ? (
                   <div class="alert alert-success">
-                    <span>✅ Premium Active</span>
+                    <span>✅ Premium Active — Unlimited exports, no watermark</span>
                   </div>
                 ) : (
                   <>
                     <div class="license-info">
-                      <p>Free: <strong>{remainingExports}/{state.freeLimit}</strong> exports remaining</p>
-                      <p class="small">720p only</p>
+                      <p>Free: <strong>{Math.max(0, remainingExports)}/{state.freeLimit}</strong> export{state.freeLimit === 1 ? '' : 's'} remaining this month</p>
+                      <p class="small">720p · Watermarked</p>
                     </div>
                     <input
                       type="email"
@@ -298,20 +442,18 @@ function App() {
                         disabled={!state.licenseKey.trim()}
                         class="btn btn-secondary btn-small"
                       >
-                        ✅ Already paid? Validate License
+                        ✅ Already paid? Validate
                       </button>
                     </div>
-                    <p class="small" style="margin-top: 8px; color: #666;">Enter email → Complete payment → Return here and validate</p>
                   </>
                 )}
               </div>
 
               <button
-                onClick={handleExport}
-                disabled={!canExport}
-                class="btn btn-primary btn-large"
+                onClick={canExport ? handleExport : handleOpenCheckout}
+                class={`btn ${canExport ? 'btn-primary' : 'btn-upgrade'} btn-large`}
               >
-                {canExport ? '🎬 Export Video' : '🔒 Upgrade to Export'}
+                {canExport ? '🎬 Export Video' : '🔒 Upgrade to Export — $8/mo'}
               </button>
             </>
           )}
@@ -342,15 +484,15 @@ function App() {
           )}
 
           {!state.isPremium && (
-            <div class="alert alert-info">
-              <p>Exports remaining: <strong>{remainingExports}</strong></p>
-              <p class="small">Want unlimited exports + HD quality?</p>
+            <div class="upgrade-card">
+              <h3 style="margin-bottom: 8px;">⭐ Remove watermark & go HD</h3>
+              <p class="small" style="margin-bottom: 4px;">Your export has a "Made with ProtoVid" watermark.</p>
+              <p class="small" style="margin-bottom: 12px;">Premium removes it and unlocks 1080p/4K + unlimited exports.</p>
               <button
-                onClick={() => setState(prev => ({ ...prev, stage: 'setup' }))}
-                class="btn btn-primary btn-small"
-                style="margin-top: 8px;"
+                onClick={handleOpenCheckout}
+                class="btn btn-upgrade btn-large"
               >
-                🛒 Upgrade to Premium ($8/mo)
+                Upgrade to Premium — $8/mo
               </button>
             </div>
           )}
@@ -358,6 +500,7 @@ function App() {
           <button
             onClick={() => setState(prev => ({ ...prev, stage: 'setup', videoUrl: null, downloadFilename: null }))}
             class="btn btn-secondary"
+            style="margin-top: 12px;"
           >
             Export Another
           </button>
