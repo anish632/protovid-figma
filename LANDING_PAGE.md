@@ -1,121 +1,92 @@
-# ProtoVid Landing Page — Copy & Structure
+# ProtoVid Landing Page - Copy Notes
 
-> A landing page already exists at `landing/index.html`. This document provides refined copy and content strategy.
+This repo already includes a landing page at `landing/index.html`. This document keeps the supporting copy aligned with the shipped product.
 
----
+## Hero
 
-## Hero Section
+**Headline:** Export Figma Prototypes as Shareable Videos
 
-**Headline:** Export Figma Prototypes as Professional Videos
+**Subheadline:** Turn connected Figma prototype frames into downloadable MP4 videos for design reviews, decks, docs, and stakeholder walkthroughs.
 
-**Subheadline:** Turn your interactive prototypes into shareable MP4 and GIF videos in seconds. No screen recording, no editing — just one click.
+**Primary CTA:** Install Free Plugin
 
-**CTA:** Install Free Plugin →
-
-**Secondary CTA:** See How It Works ↓
-
----
+**Secondary CTA:** See How It Works
 
 ## Problem Statement
 
-> "I need to share my prototype with stakeholders who don't have Figma access."
+Designers often need to share prototype flows with people who do not live inside Figma. Screen recording is slow, messy, and inconsistent.
 
-Screen recording is tedious. You fight with crop settings, cursor position, and screen clutter. The result looks unprofessional.
+ProtoVid captures prototype-connected frames automatically and exports a video that is easier to share in reviews, decks, docs, and social posts.
 
-**ProtoVid captures your prototype flow automatically** — every frame, every transition — and exports a clean, high-quality video.
+## How It Works
 
----
-
-## How It Works (3 Steps)
-
-1. **Open your prototype** — ProtoVid auto-detects all frames and interactions
-2. **Choose your settings** — Resolution, frame rate, format (MP4/GIF)
-3. **Export** — Download a polished video ready to share
-
----
+1. **Open the plugin** on a page with prototype connections
+2. **Choose quality settings** like resolution
+3. **Export and share** the finished video
 
 ## Feature Highlights
 
-### 🎥 Up to 4K Resolution
-Crystal clear exports at 720p, 1080p, or 4K. Your designs deserve to look sharp.
+### Up to 4K Resolution
+Export at 720p for free, or unlock 1080p and 4K for high-quality presentations.
 
-### 🖱️ Animated Cursor
-Show interaction flow with a smooth animated cursor. Perfect for walkthroughs and tutorials.
+### Auto Flow Detection
+ProtoVid uses Figma flow starting points and interaction graph data to discover prototype-connected frames.
 
-### ⚡ One-Click Export
-No configuration needed for quick exports. Advanced settings available when you want them.
+### Watermark-Free Pro Exports
+Free exports include a watermark. Pro removes it for cleaner sharing.
 
-### 📐 Auto Flow Detection
-Automatically traverses your entire prototype flow — no manual frame selection.
+### MP4 Delivery
+Exports are optimized for shareable MP4 output that works in slides, docs, chat, and reviews.
 
-### 🎨 MP4 + GIF
-MP4 for presentations and Loom-style sharing. GIF for Slack, docs, and quick embeds.
-
-### 🔄 Persistent License
-Enter your key once — it stays saved across sessions and devices.
-
----
-
-## Social Proof (to add post-launch)
-
-- Number of installs
-- Testimonial quotes from beta users
-- "Used by designers at [companies]"
-
----
+### Email-Based Upgrade Flow
+Users start free with their email, then upgrade through Stripe when they need higher quality or unlimited exports.
 
 ## Pricing
 
 ### Free
-- 3 exports
+
+- 1 export per month
 - 720p resolution
-- MP4 only
-- Watermarked
+- MP4 export
+- Watermarked output
 
-### Premium — $12/month
+### Pro
+
 - Unlimited exports
-- Up to 4K resolution
-- MP4 + GIF
-- No watermarks
-- Priority support
+- 1080p and 4K resolution
+- No watermark
 
-**CTA:** Get Premium → (links to Lemon Squeezy checkout)
-
----
+If you want hard-coded pricing in the landing page, keep it aligned with the plugin checkout options before publishing.
 
 ## FAQ
 
-**Q: Do I need Figma Pro?**
-A: No. ProtoVid works with any Figma plan including Free.
+**Q: Do I need a paid Figma plan?**
+A: No. ProtoVid works with standard Figma prototype flows.
 
-**Q: How do I get my license key?**
-A: After purchase, you'll receive a license key via email. Paste it in the plugin to activate.
+**Q: How do I unlock Pro?**
+A: Enter your email in the plugin and complete the Stripe checkout flow when prompted.
 
-**Q: Can I use one license on multiple computers?**
-A: Yes — your license key works anywhere you use Figma.
+**Q: Can I use Pro on multiple computers?**
+A: Yes, as long as you use the same email tied to the subscription.
 
-**Q: What happens after my subscription ends?**
-A: You revert to the free tier. No data is lost.
+**Q: What happens if the MP4 transcode fails?**
+A: The plugin shows a conversion error and asks the user to retry. It does not return another video format.
 
 **Q: Is my design data sent to your servers?**
-A: Frame images are processed for video encoding but never stored. License validation sends only the license key.
-
----
+A: Exported frame data is sent to the backend for MP4 transcoding, and email is used for subscription and usage tracking.
 
 ## SEO Keywords
+
 - Figma prototype video export
 - Export Figma prototype as MP4
 - Figma to video plugin
-- Record Figma prototype
-- Figma GIF export
 - Figma prototype presentation
-
----
+- Share Figma prototype video
 
 ## Deployment Notes
 
-The existing `landing/index.html` is a good start. To deploy:
-1. Host on Vercel/Netlify/GitHub Pages
-2. Point a custom domain (e.g., protovid.app) to it
-3. Update Lemon Squeezy checkout links with real product URLs
-4. Add analytics (Plausible or Simple Analytics recommended for privacy)
+Before publishing:
+
+1. Keep the landing page copy aligned with the plugin UI.
+2. Point all upgrade links to the real production pricing or checkout flow.
+3. Avoid mentioning GIF export, cursor animation, or account-free usage unless those are truly shipped.

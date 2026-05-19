@@ -1,162 +1,81 @@
-# 🚀 ProtoVid - Quick Start (5 Minutes)
+# ProtoVid - Quick Start
 
-Get ProtoVid running in Figma in under 5 minutes.
+Get ProtoVid running in Figma in a few minutes.
 
----
-
-## Step 1: Build the Plugin (30 seconds)
+## Step 1: Build the plugin
 
 ```bash
-cd /Users/anishdas/apps/protovid-figma
-npm install  # (already done)
+npm install
 npm run build
 ```
 
-You should see:
-```
-✅ Build complete
-```
+## Step 2: Load it in Figma Desktop
 
----
+1. Open Figma Desktop.
+2. Go to **Menu -> Plugins -> Development -> Import plugin from manifest...**
+3. Select `manifest.json` from this repo.
+4. Confirm ProtoVid appears under **Plugins -> Development**.
 
-## Step 2: Load in Figma Desktop (1 minute)
+## Step 3: Create a tiny prototype
 
-1. **Open Figma Desktop** (not browser)
-2. Open any Figma file or create a new one
-3. Go to **Menu (☰) → Plugins → Development → Import plugin from manifest...**
-4. Navigate to `/Users/anishdas/apps/protovid-figma/`
-5. Select `manifest.json`
-6. Click **Open**
+1. Create 3 frames on the same page.
+2. Add prototype interactions:
+   - Frame 1 -> Frame 2
+   - Frame 2 -> Frame 3
+3. Set a flow starting point if needed.
 
-✅ ProtoVid should now appear in **Plugins → Development → ProtoVid**
+## Step 4: Export
 
----
+1. Run **Plugins -> Development -> ProtoVid**.
+2. Enter your email on the start screen.
+3. Leave the default settings:
+   - 720p
+4. Click the export button.
 
-## Step 3: Create a Test Prototype (2 minutes)
+## Expected results
 
-1. Create a **new Figma file**
-2. Draw **3 frames** (press F to create frames)
-   - Name them: "Home", "Details", "Success"
-3. Add some content (text, shapes, anything)
-4. **Add prototype interactions:**
-   - Select "Home" frame
-   - Switch to Prototype tab (right sidebar)
-   - Click on a button/element → drag blue arrow → connect to "Details"
-   - Repeat: "Details" → "Success"
+- The plugin detects prototype frames on the current page.
+- Export progress appears in the UI.
+- A downloadable MP4 video file is generated.
+- If backend transcoding fails, the plugin shows a conversion error instead of returning AVI.
 
-🎯 You now have a simple prototype flow!
+## Optional: Test the Pro path
 
----
+If your backend is configured with Stripe in test mode:
 
-## Step 4: Run ProtoVid (1 minute)
+1. Trigger a Pro-only option such as 1080p or 4K.
+2. Complete checkout with a Stripe test card.
+3. Wait for the plugin to detect the updated subscription automatically.
 
-1. Go to **Plugins → Development → ProtoVid**
-2. The plugin UI should open and show:
-   - "Found **3** prototype frames"
-   - Export settings panel
-3. Keep settings as default:
-   - Resolution: **720p** (free tier)
-   - Frame Rate: **30 fps**
-   - Format: **MP4**
-4. Click **"🎬 Export Video"**
+## Common issues
 
----
+### "No prototype found"
 
-## Step 5: Test Premium Features (optional)
+- Ensure the current page has prototype connections.
+- Add a Figma flow starting point if export order is unclear.
 
-To test premium features without paying:
+### Plugin won't load
 
-1. In the plugin UI, find the **License Key** input
-2. Enter: `DEV_TEST_KEY`
-3. Click **"Validate License"**
-4. You should see: **"✅ Premium Active"**
-5. Now you can select:
-   - 1080p or 4K resolution
-   - GIF format
-   - No watermark
+- Re-run `npm run build`.
+- Make sure `dist/` exists.
+- Restart Figma Desktop if needed.
 
----
+### Export is blocked after one run
 
-## Expected Results
+- That is expected on the free tier.
+- Use Pro or wait for the monthly limit reset.
 
-### ✅ Success Indicators
-- Plugin loads without errors
-- UI shows prototype frames count
-- Export button is clickable
-- Progress bar animates during export
-- Test license key validates successfully
+## What's already working
 
-### ⚠️ Common Issues
+- Plugin UI and export flow
+- Current-page prototype detection
+- Free vs Pro feature gating
+- Email-based usage tracking
+- Stripe-backed upgrade flow
+- Backend MP4 transcoding
 
-**"No prototype found"**
-- Make sure you created prototype interactions (blue arrows)
-- Check you're on the correct page in Figma
+## Next
 
-**Plugin won't load**
-- Run `npm run build` again
-- Restart Figma Desktop
-- Check that `dist/` folder exists and has files
-
-**Build errors**
-- Delete `node_modules/` and run `npm install` again
-- Make sure you're in the right directory
-
----
-
-## What's Working
-
-✅ Plugin loads in Figma  
-✅ UI renders and detects prototypes  
-✅ Frame capture system functional  
-✅ License validation (with test keys)  
-✅ Free tier limits enforced  
-✅ Progress tracking  
-
-## What's Placeholder
-
-🔧 **Video encoding** - Currently returns mock data. To implement:
-- Deploy backend to Vercel
-- Add FFmpeg encoding in `/api/encode-video.ts`
-- Update plugin to call real API
-
-The plugin is **fully functional for development** and ready to demo the complete user flow!
-
----
-
-## Development Workflow
-
-### Make Code Changes
-```bash
-# Watch mode (auto-rebuild)
-npm run watch
-```
-
-Then in Figma:
-1. Right-click plugin → **"Reload plugin"**
-2. Test your changes
-
-### Common Edits
-- **UI changes:** Edit `src/ui.tsx`
-- **Plugin logic:** Edit `src/code.ts`
-- **Styles:** Edit CSS in `src/ui.html`
-
----
-
-## Next: Full Backend Setup
-
-See **SETUP.md** for:
-- Deploying to Vercel
-- Setting up Lemon Squeezy
-- Implementing FFmpeg encoding
-- Publishing to Figma Community
-
----
-
-## Questions?
-
-- 📖 Full docs: **README.md**
-- 🔧 Setup guide: **SETUP.md**
-- 📊 Overview: **PROJECT_SUMMARY.md**
-- 🐛 Issues: https://github.com/anish632/protovid-figma/issues
-
-**You're ready to build!** 🚀
+- See `SETUP.md` for full backend setup
+- See `DEPLOYMENT_CHECKLIST.md` for publish prep
+- See `PROJECT_SUMMARY.md` for the current architecture snapshot

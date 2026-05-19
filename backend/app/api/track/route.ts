@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { sanitizeError, trackingRequestSchema } from '@/lib/validation';
 
 function getDB() {
   if (!process.env.NEON_DATABASE_URL) {
@@ -22,17 +23,8 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const sql = getDB();
-    const { email, eventType, pluginVersion, metadata } = await request.json();
-
-    if (!eventType) {
-      return NextResponse.json({ error: 'Event type required' }, { status: 400 });
-    }
-
-    // Valid event types
-    const validEventTypes = ['export', 'checkout_start', 'license_validate', 'plugin_load'];
-    if (!validEventTypes.includes(eventType)) {
-      return NextResponse.json({ error: 'Invalid event type' }, { status: 400 });
-    }
+    const body = await request.json();
+    const { email, eventType, pluginVersion, metadata } = trackingRequestSchema.parse(body);
 
     await sql`
       INSERT INTO protovid_events (
@@ -57,6 +49,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Track error:', error);
-    return NextResponse.json({ error: 'Failed to track event' }, { status: 500 });
+    const status = error instanceof Error && error.name === 'ZodError' ? 400 : 500;
+    return NextResponse.json({ error: sanitizeError(error) }, { status });
   }
 }

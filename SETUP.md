@@ -2,222 +2,155 @@
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install dependencies
+
 ```bash
-cd /Users/anishdas/apps/protovid-figma
 npm install
 ```
 
-### 2. Build the Plugin
+### 2. Build the plugin
+
 ```bash
 npm run build
 ```
 
 ### 3. Load in Figma
 
-**Method 1: Figma Desktop (Recommended for Development)**
-1. Open Figma Desktop app
-2. Go to **Menu → Plugins → Development → Import plugin from manifest...**
-3. Navigate to `/Users/anishdas/apps/protovid-figma/` and select `manifest.json`
-4. The plugin will now appear in **Plugins → Development → ProtoVid**
+1. Open Figma Desktop.
+2. Go to **Menu -> Plugins -> Development -> Import plugin from manifest...**
+3. Select `manifest.json` from this repo.
+4. The plugin appears under **Plugins -> Development -> ProtoVid**.
 
-**Method 2: Run a prototype in Figma**
-1. Create a simple prototype with 2-3 frames and interactions
-2. Run **Plugins → Development → ProtoVid**
-3. The plugin UI should open showing your prototype info
+### 4. Test a basic export
 
-### 4. Development Workflow
+1. Create a small prototype with 2-3 connected frames on one page.
+2. Run **Plugins -> Development -> ProtoVid**.
+3. Enter an email address in the start screen.
+4. Keep the default free settings:
+   - 720p
+5. Click **Export Video**.
 
-**Watch Mode (Auto-rebuild on changes):**
+## Development Workflow
+
 ```bash
 npm run watch
 ```
 
-After making code changes:
-1. Save your files
-2. In Figma, right-click the plugin → **Reload plugin**
-3. Test your changes
+After making changes:
 
-## Testing the Plugin
+1. Save files.
+2. In Figma, right-click the development plugin.
+3. Click **Reload plugin**.
 
-### Create a Test Prototype
-1. Create 3 frames in Figma
-2. Add prototype interactions:
-   - Frame 1 → (Click) → Frame 2
-   - Frame 2 → (Click) → Frame 3
-3. Run the plugin
-4. Select export settings (use 720p for free tier)
-5. Click "Export Video"
+## Current Product Behavior
 
-### Test License Keys (Development)
-The plugin accepts test license keys:
-- `DEV_TEST_KEY` - validates as premium
-- `PREMIUM_12345` - validates as premium
-- Any other key - validates as free tier
+- Free tier: 1 export per month, 720p, watermarked
+- Pro tier: unlimited exports, 1080p/4K, no watermark
+- Premium access is tied to the user's email and Stripe subscription status
+- Export discovery is based on prototype-connected frames on the current page
 
-## Backend Setup (Optional for Full Functionality)
+## Backend Setup
 
-The plugin currently has placeholder backend code. To enable actual video encoding:
+The plugin is currently wired to `https://backend-one-nu-28.vercel.app`. If you want to run your own backend:
 
-### Deploy to Vercel
+### 1. Install backend dependencies
+
 ```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel
+cd backend
+npm install
 ```
 
-### Set Environment Variables
-In Vercel dashboard, add:
-```
-LEMON_SQUEEZY_API_KEY=your_api_key_here
-```
+### 2. Configure environment variables
 
-### Update manifest.json
-Replace `allowedDomains` with your Vercel URL:
-```json
-"networkAccess": {
-  "allowedDomains": [
-    "https://your-project.vercel.app",
-    "https://api.lemonsqueezy.com"
-  ]
-}
+Add these in your local environment or Vercel project:
+
+```bash
+STRIPE_SECRET_KEY=<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=<your-stripe-webhook-signing-secret>
+PROTOVID_PRICE_ID=<your-stripe-monthly-price-id>
+PROTOVID_YEARLY_PRICE_ID=<your-stripe-yearly-price-id>
+NEXT_PUBLIC_APP_URL=<your-backend-app-url>
+NEON_DATABASE_URL=<your-neon-postgres-connection-string>
 ```
 
-## Lemon Squeezy Setup
+Optional:
 
-### 1. Create Lemon Squeezy Account
-- Sign up at [lemonsqueezy.com](https://lemonsqueezy.com)
-- Create a product: "ProtoVid Premium"
-- Set price: $12/month (recurring)
-
-### 2. Generate API Key
-- Go to Settings → API
-- Create new API key
-- Copy key to Vercel environment variables
-
-### 3. License Key Flow
-When users purchase:
-1. They receive a license key via email
-2. They enter it in the plugin
-3. Plugin calls `/api/validate-license` with the key
-4. Backend validates with Lemon Squeezy API
-5. Plugin unlocks premium features
-
-## File Structure
-
-```
-protovid-figma/
-├── manifest.json          # Figma plugin manifest
-├── package.json           # Dependencies
-├── tsconfig.json          # TypeScript config
-├── build.js              # Build script (esbuild)
-├── src/
-│   ├── code.ts           # Main plugin code (Figma sandbox)
-│   ├── ui.tsx            # Plugin UI (Preact)
-│   └── ui.html           # UI container
-├── api/                  # Backend API routes (Vercel)
-│   ├── encode-video.ts   # Video encoding endpoint
-│   └── validate-license.ts # License validation
-├── landing/
-│   └── index.html        # Landing page
-├── dist/                 # Built files (generated)
-│   ├── code.js
-│   ├── ui.js
-│   └── ui.html
-└── README.md
+```bash
+PROTOVID_FREE_EXPORT_LIMIT=1
 ```
 
-## Key Features Implemented
+### 3. Initialize the database
 
-✅ **Plugin Core**
-- Figma plugin manifest and structure
-- TypeScript-based codebase
-- Preact UI with state management
-- Build system (esbuild)
+```bash
+cd backend
+NEON_DATABASE_URL="<your-neon-connection-string>" npx tsx lib/db-init.ts
+```
 
-✅ **Prototype Detection**
-- Scans current page for frames
-- Detects prototype interactions
-- Analyzes flow paths
+### 4. Run or deploy the backend
 
-✅ **Frame Capture**
-- Exports frames as PNG
-- Scales to target resolution (720p/1080p/4K)
-- Follows prototype flow
+```bash
+cd backend
+npm run dev
+```
 
-✅ **License System**
-- Free tier: 3 exports/month, 720p, watermarked
-- Premium tier: Unlimited, 4K, no watermark
-- License key validation structure
-- Test keys for development
+For production deployment, see `backend/VERCEL_DEPLOYMENT.md`.
 
-✅ **UI/UX**
-- Frame selection and preview
-- Export settings (resolution, FPS, format)
-- Progress tracking
-- License key input
+### 5. Point the plugin at your backend
 
-✅ **Backend Structure**
-- Next.js API route for video encoding
-- Lemon Squeezy integration code
-- License validation endpoint
+Update these files:
 
-## Next Steps for Production
+- `src/code.ts`
+- `src/ui.tsx`
+- `src/encoder.ts`
+- `manifest.json` `networkAccess.allowedDomains`
 
-### 1. Implement Video Encoding
-The `/api/encode-video.ts` file has placeholder code. To make it functional:
-- Install FFmpeg or ffmpeg.wasm
-- Implement frame stitching
-- Add watermark for free tier
-- Upload to cloud storage (S3, Cloudflare R2, etc.)
+Then rebuild the plugin.
 
-### 2. Publish Plugin
-- Get unique plugin ID from Figma
-- Update `manifest.json` with real ID
-- Submit to Figma Community
-- Wait for review approval
+## Billing Flow
 
-### 3. Launch Landing Page
-- Deploy `landing/index.html` to Vercel/Netlify
-- Set up domain (e.g., protovid.app)
-- Update all links in plugin and landing page
+1. User enters an email in the plugin.
+2. Plugin checks the backend for free-tier usage and subscription status.
+3. If the user chooses a Pro-only action, the plugin opens Stripe Checkout.
+4. Stripe webhook updates the user's subscription record in Neon.
+5. The plugin re-checks status by email and unlocks Pro automatically.
 
-### 4. Marketing
-- Post on Figma Community forums
-- Share on Twitter, Product Hunt
-- Create demo video showing the plugin
-- Write tutorial blog posts
+## Key Files
+
+```text
+src/code.ts                      # Figma sandbox + export orchestration
+src/ui.tsx                       # UI state, email gate, upgrade flow
+src/encoder.ts                   # Local AVI creation and MP4 upload
+backend/app/api/encode-video     # Active MP4 transcoding route
+backend/app/api/validate-license # Email-based premium lookup
+backend/app/api/billing          # Stripe checkout, portal, webhook
+backend/lib/storage.ts           # Neon-backed subscription storage
+```
 
 ## Troubleshooting
 
 ### Plugin won't load
-- Make sure you ran `npm run build`
-- Check that `dist/` directory exists and has files
-- Try restarting Figma Desktop
 
-### "No prototype found" error
-- Make sure your Figma file has prototype interactions
-- Interactions must be on the current page
-- Check that frames have click/tap actions set up
+- Run `npm run build` again.
+- Make sure `dist/` exists.
+- Restart Figma Desktop if needed.
 
-### Build errors
-- Delete `node_modules/` and run `npm install` again
-- Make sure TypeScript version is compatible
-- Check for syntax errors in .ts/.tsx files
+### "No prototype found"
 
-### License validation not working
-- In development, use test keys: `DEV_TEST_KEY`
-- Backend API must be deployed and accessible
-- Check network tab in browser dev tools (Ctrl+Shift+I in plugin)
+- Make sure frames on the current page have prototype interactions.
+- Set a Figma flow starting point if the page has multiple flows.
 
-## Support
+### MP4 conversion fails
 
-- GitHub Issues: https://github.com/anish632/protovid-figma/issues
-- Email: support@protovid.app (placeholder)
-- Documentation: README.md
+- Check the backend deployment and `encode-video` route logs.
+- Confirm the route allows `POST, OPTIONS` CORS requests with the `Content-Type` header.
 
----
+### Upgrade flow does not unlock Pro
 
-Built with ❤️ for designers
+- Verify Stripe webhook delivery.
+- Confirm the same email was used in the plugin and in checkout.
+- Check the subscription record in Neon.
+
+## Notes for Local Testing
+
+- The shipping UI is email-first, not license-key-first.
+- The backend still accepts `DEV_*` and `PREMIUM_*` values in non-production through `/api/validate-license` for direct API testing.

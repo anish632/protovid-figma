@@ -1,17 +1,7 @@
-/*
- * POST /api/exports/increment
- * Increment a user's server-side export count for the current month
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-
-function getDB() {
-  if (!process.env.NEON_DATABASE_URL) {
-    throw new Error('Database not configured');
-  }
-  return neon(process.env.NEON_DATABASE_URL);
-}
+import { FREE_TIER_EXPORT_LIMIT, PRO_TIER_EXPORT_LIMIT, isPremiumSubscription } from '@/lib/plans';
+import { getSubscription, incrementExportCount } from '@/lib/storage';
+import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,46 +15,41 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    const sql = getDB();
-    const { email } = await request.json();
+    const body = await request.json();
+    const { email } = exportCheckRequestSchema.parse(body);
+    const existing = await getSubscription(email);
+    const isPremium = isPremiumSubscription(existing);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const exportsThisMonth = existing.lastResetMonth === currentMonth ? existing.exportsThisMonth : 0;
 
-    if (!email || !email.includes('@')) {
+    if (!isPremium && exportsThisMonth >= FREE_TIER_EXPORT_LIMIT) {
       return NextResponse.json(
-        { error: 'Valid email required' },
-        { status: 400, headers: corsHeaders }
+        {
+          success: false,
+          exportsThisMonth,
+          limit: FREE_TIER_EXPORT_LIMIT,
+          error: 'Free export limit reached',
+        },
+        { status: 403, headers: corsHeaders }
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-
-    // Upsert: insert or increment
-    await sql`
-      INSERT INTO protovid_export_counts (email, month, count, updated_at)
-      VALUES (${normalizedEmail}, ${currentMonth}, 1, CURRENT_TIMESTAMP)
-      ON CONFLICT (email, month)
-      DO UPDATE SET
-        count = protovid_export_counts.count + 1,
-        updated_at = CURRENT_TIMESTAMP
-    `;
-
-    // Return updated count
-    const result = await sql`
-      SELECT count FROM protovid_export_counts
-      WHERE email = ${normalizedEmail} AND month = ${currentMonth}
-    `;
-
-    const newCount = result.length > 0 ? parseInt(result[0].count) : 1;
+    const subscription = await incrementExportCount(email);
 
     return NextResponse.json(
-      { success: true, exportsThisMonth: newCount },
+      {
+        success: true,
+        exportsThisMonth: subscription.exportsThisMonth,
+        limit: isPremiumSubscription(subscription) ? PRO_TIER_EXPORT_LIMIT : FREE_TIER_EXPORT_LIMIT,
+      },
       { headers: corsHeaders }
     );
   } catch (error) {
     console.error('Export increment error:', error);
+    const status = error instanceof Error && error.name === 'ZodError' ? 400 : 500;
     return NextResponse.json(
-      { success: false, error: 'Failed to increment' },
-      { status: 500, headers: corsHeaders }
+      { success: false, error: sanitizeError(error) },
+      { status, headers: corsHeaders }
     );
   }
 }

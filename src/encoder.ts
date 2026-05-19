@@ -1,6 +1,8 @@
 // ProtoVid - Client-side video encoder (runs in UI iframe context)
-// Pure JS MJPEG AVI encoder — no WASM, no eval, works in Figma's restricted iframe.
+// Primary: WebCodecs API (VideoEncoder) + mp4-muxer -> H.264 MP4 (no server needed)
+// Fallback: pure-JS MJPEG AVI, then backend FFmpeg transcode to MP4
 
+import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 interface FrameInput {
   imageData: Uint8Array;
   width: number;
@@ -16,6 +18,7 @@ type ProgressCallback = (percent: number) => void;
 
 // Each prototype frame is held for this many seconds in the output video
 const FRAME_HOLD_SECONDS = 2;
+const BACKEND_URL = 'https://protovid.dasgroupllc.com';
 
 async function loadPNG(data: Uint8Array): Promise<ImageBitmap> {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
@@ -36,11 +39,101 @@ function canvasToJPEG(canvas: HTMLCanvasElement, quality: number): Promise<Uint8
   });
 }
 
-/**
- * Build an AVI file with MJPEG video stream from JPEG frames.
- * Pure JS — only needs ArrayBuffer, no browser media APIs.
- */
-function createMJPEGAVI(
+function drawWatermark(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const fontSize = Math.max(16, Math.round(height * 0.028));
+  ctx.save();
+
+  const barHeight = fontSize * 2.2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  ctx.fillRect(0, height - barHeight, width, barHeight);
+
+  ctx.font = `600 ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.fillText('Made with love by ProtoVid - protovid.dasgroupllc.com', width / 2, height - barHeight / 2);
+
+  ctx.restore();
+}
+
+// ─── Primary path: H.264 MP4 via WebCodecs ───────────────────────────────────
+
+async function encodeMP4WebCodecs(
+  frames: FrameInput[],
+  onProgress: ProgressCallback,
+  addWatermark: boolean
+): Promise<Uint8Array> {
+  const first = await loadPNG(frames[0].imageData);
+  const width = first.width;
+  const height = first.height;
+  first.close();
+
+  const fps = 1;
+
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    video: { codec: 'avc', width, height, frameRate: fps },
+    fastStart: 'in-memory',
+  });
+
+  let encodeError: Error | null = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => { encodeError = e; },
+  });
+
+  encoder.configure({
+    codec: 'avc1.42001f', // H.264 Baseline Profile Level 3.1
+    width,
+    height,
+    bitrate: 2_000_000,
+    framerate: fps,
+    avc: { format: 'avc' },
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to create canvas context');
+
+  let frameIndex = 0;
+  for (let i = 0; i < frames.length; i++) {
+    if (encodeError) throw encodeError;
+
+    const bmp = await loadPNG(frames[i].imageData);
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(bmp, 0, 0, width, height);
+    bmp.close();
+
+    if (addWatermark) drawWatermark(ctx, width, height);
+
+    const snapshot = await createImageBitmap(canvas);
+    for (let t = 0; t < FRAME_HOLD_SECONDS; t++) {
+      const videoFrame = new VideoFrame(snapshot, {
+        timestamp: frameIndex * 1_000_000,
+        duration: 1_000_000,
+      });
+      encoder.encode(videoFrame, { keyFrame: frameIndex === 0 });
+      videoFrame.close();
+      frameIndex++;
+    }
+    snapshot.close();
+
+    onProgress(20 + ((i + 1) / frames.length) * 75);
+  }
+
+  await encoder.flush();
+  if (encodeError) throw encodeError;
+  muxer.finalize();
+
+  return new Uint8Array(target.buffer);
+}
+
+// ─── Fallback path: MJPEG AVI (pure JS, no browser APIs needed) ──────────────
+
+function buildMJPEGAVI(
   jpegFrames: Uint8Array[],
   width: number,
   height: number,
@@ -48,10 +141,8 @@ function createMJPEGAVI(
 ): Uint8Array {
   const numFrames = jpegFrames.length;
   const maxChunk = Math.max(...jpegFrames.map(f => f.length));
-  // AVI chunks must be word-aligned (2-byte)
   const padded = jpegFrames.map(f => f.length + (f.length % 2));
 
-  /* ---- section sizes ---- */
   const AVIH = 56, STRH = 56, STRF = 40;
   const strl = 4 + (8 + STRH) + (8 + STRF);
   const hdrl = 4 + (8 + AVIH) + (8 + strl);
@@ -76,118 +167,48 @@ function createMJPEGAVI(
 
   const usPerFrame = Math.round(1_000_000 / fps);
 
-  /* ---- RIFF / AVI ---- */
   cc('RIFF'); u32(riff); cc('AVI ');
-
-  /* ---- hdrl LIST ---- */
   cc('LIST'); u32(hdrl); cc('hdrl');
-
-  /* avih — Main AVI Header */
   cc('avih'); u32(AVIH);
-  u32(usPerFrame);                    // dwMicroSecPerFrame
-  u32(maxChunk * fps);                // dwMaxBytesPerSec (approx)
-  u32(0);                             // dwPaddingGranularity
-  u32(0x10);                          // dwFlags = AVIF_HASINDEX
-  u32(numFrames);                     // dwTotalFrames
-  u32(0);                             // dwInitialFrames
-  u32(1);                             // dwStreams
-  u32(maxChunk);                      // dwSuggestedBufferSize
-  u32(width);                         // dwWidth
-  u32(height);                        // dwHeight
-  u32(0); u32(0); u32(0); u32(0);    // reserved
+  u32(usPerFrame); u32(maxChunk * fps); u32(0); u32(0x10);
+  u32(numFrames); u32(0); u32(1); u32(maxChunk); u32(width); u32(height);
+  u32(0); u32(0); u32(0); u32(0);
 
-  /* ---- strl LIST ---- */
   cc('LIST'); u32(strl); cc('strl');
-
-  /* strh — Stream Header */
   cc('strh'); u32(STRH);
-  cc('vids');                         // fccType
-  cc('MJPG');                         // fccHandler
-  u32(0);                             // dwFlags
-  u16(0); u16(0);                     // wPriority, wLanguage
-  u32(0);                             // dwInitialFrames
-  u32(1);                             // dwScale
-  u32(fps);                           // dwRate → fps
-  u32(0);                             // dwStart
-  u32(numFrames);                     // dwLength
-  u32(maxChunk);                      // dwSuggestedBufferSize
-  i32(-1);                            // dwQuality (default)
-  u32(0);                             // dwSampleSize
-  i16(0); i16(0); i16(width); i16(height); // rcFrame
+  cc('vids'); cc('MJPG'); u32(0); u16(0); u16(0); u32(0);
+  u32(1); u32(fps); u32(0); u32(numFrames); u32(maxChunk);
+  i32(-1); u32(0); i16(0); i16(0); i16(width); i16(height);
 
-  /* strf — BITMAPINFOHEADER */
   cc('strf'); u32(STRF);
-  u32(40);                            // biSize
-  i32(width);                         // biWidth
-  i32(height);                        // biHeight
-  u16(1);                             // biPlanes
-  u16(24);                            // biBitCount
-  cc('MJPG');                         // biCompression
-  u32(width * height * 3);            // biSizeImage
-  i32(0); i32(0);                     // pels/meter
-  u32(0); u32(0);                     // clr used/important
+  u32(40); i32(width); i32(height); u16(1); u16(24); cc('MJPG');
+  u32(width * height * 3); i32(0); i32(0); u32(0); u32(0);
 
-  /* ---- movi LIST ---- */
   cc('LIST'); u32(movi); cc('movi');
 
   const offsets: number[] = [];
-  let off = 4; // byte offset from 'movi' fourcc
+  let off = 4;
   for (let i = 0; i < numFrames; i++) {
     offsets.push(off);
-    cc('00dc');
-    u32(jpegFrames[i].length);
+    cc('00dc'); u32(jpegFrames[i].length);
     u8.set(jpegFrames[i], p); p += jpegFrames[i].length;
     if (jpegFrames[i].length % 2) dv.setUint8(p++, 0);
     off += 8 + padded[i];
   }
 
-  /* ---- idx1 — frame index ---- */
   cc('idx1'); u32(idx1);
   for (let i = 0; i < numFrames; i++) {
-    cc('00dc');
-    u32(0x10);                        // AVIIF_KEYFRAME
-    u32(offsets[i]);
-    u32(jpegFrames[i].length);
+    cc('00dc'); u32(0x10); u32(offsets[i]); u32(jpegFrames[i].length);
   }
 
   return u8;
 }
 
-/**
- * Draw a semi-transparent watermark on the canvas for free-tier users.
- */
-function drawWatermark(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  const text = 'Made with ProtoVid';
-  const fontSize = Math.max(14, Math.round(height * 0.025));
-  ctx.save();
-  ctx.font = `bold ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-
-  // Shadow for readability on any background
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 4;
-  ctx.shadowOffsetX = 1;
-  ctx.shadowOffsetY = 1;
-
-  // Semi-transparent white text
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.fillText(text, width - fontSize * 0.8, height - fontSize * 0.6);
-  ctx.restore();
-}
-
-/**
- * Encode prototype frames as MJPEG AVI video.
- * Converts each PNG frame → JPEG via Canvas, then wraps in AVI container.
- * Each prototype frame is repeated to hold for FRAME_HOLD_SECONDS.
- * Adds watermark for free-tier users.
- */
-async function encodeAVI(
+async function encodeAVIFallback(
   frames: FrameInput[],
-  _settings: EncodeSettings,
   onProgress: ProgressCallback,
-  addWatermark: boolean = false
-): Promise<Uint8Array> {
+  addWatermark: boolean
+): Promise<{ data: Uint8Array; ext: string; mime: string }> {
   const first = await loadPNG(frames[0].imageData);
   const width = first.width;
   const height = first.height;
@@ -199,7 +220,6 @@ async function encodeAVI(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Failed to create canvas context');
 
-  // Use 1 fps and repeat each frame FRAME_HOLD_SECONDS times
   const fps = 1;
   const jpegFrames: Uint8Array[] = [];
 
@@ -209,82 +229,82 @@ async function encodeAVI(
     ctx.drawImage(bmp, 0, 0, width, height);
     bmp.close();
 
-    // Add watermark for free-tier exports
-    if (addWatermark) {
-      drawWatermark(ctx, width, height);
-    }
+    if (addWatermark) drawWatermark(ctx, width, height);
 
     const jpeg = await canvasToJPEG(canvas, 0.92);
+    for (let t = 0; t < FRAME_HOLD_SECONDS; t++) jpegFrames.push(jpeg);
 
-    // Repeat frame for hold duration
-    for (let t = 0; t < FRAME_HOLD_SECONDS; t++) {
-      jpegFrames.push(jpeg);
+    onProgress(20 + ((i + 1) / frames.length) * 75);
+  }
+
+  return {
+    data: buildMJPEGAVI(jpegFrames, width, height, fps),
+    ext: 'avi',
+    mime: 'video/avi',
+  };
+}
+
+async function transcodeAVIToMP4(data: Uint8Array): Promise<Uint8Array> {
+  const response = await fetch(`${BACKEND_URL}/api/encode-video`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'video/avi' },
+    body: data,
+  });
+
+  if (!response.ok) {
+    let message = 'MP4 conversion failed. Please try again.';
+    try {
+      const error = await response.json();
+      if (error?.error) message = error.error;
+    } catch (_e) {
+      // Keep the generic error.
     }
-
-    onProgress(60 + ((i + 1) / frames.length) * 30);
+    throw new Error(message);
   }
 
-  return createMJPEGAVI(jpegFrames, width, height, fps);
+  return new Uint8Array(await response.arrayBuffer());
 }
 
-const BACKEND_URL = 'https://backend-one-nu-28.vercel.app';
+// ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Upload MJPEG AVI to backend for server-side transcoding to H.264 MP4.
- * Returns the MP4 data or null if transcoding fails.
- */
-async function transcodeToMP4(aviData: Uint8Array): Promise<Uint8Array | null> {
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/encode-video`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: aviData,
-    });
-
-    if (!response.ok) return null;
-
-    const buf = await response.arrayBuffer();
-    return new Uint8Array(buf);
-  } catch (_e) {
-    return null;
-  }
-}
-
-/**
- * Main entry point — encode frames to video.
- * Encodes MJPEG AVI locally, then uploads to server for MP4 transcoding.
- * Falls back to AVI download if server transcoding fails.
- * @param isPremium - if false, adds watermark to frames
+ * Encode prototype frames to video.
+ * Tries H.264 MP4 via WebCodecs first; falls back to backend MP4 transcode.
+ * @param isPremium - when false, a watermark is burned into the video
  */
 export async function encodeVideo(
   frames: FrameInput[],
   settings: EncodeSettings,
   onProgress: ProgressCallback,
-  isPremium: boolean = true
+  isPremium: boolean = false
 ): Promise<{ url: string; filename: string }> {
-  if (!frames.length) {
-    throw new Error('No frames to encode');
-  }
+  if (!frames.length) throw new Error('No frames to encode');
 
   const addWatermark = !isPremium;
-  const aviData = await encodeAVI(frames, settings, onProgress, addWatermark);
 
-  // Attempt server-side transcoding to MP4
-  onProgress(92);
-  const mp4Data = await transcodeToMP4(aviData);
+  const stamp = Date.now();
 
-  if (mp4Data) {
-    const blob = new Blob([mp4Data], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-    const filename = `protovid-export-${Date.now()}.mp4`;
-    onProgress(100);
-    return { url, filename };
+  // 1. Try WebCodecs H.264 MP4 first (best compatibility)
+  if (typeof VideoEncoder !== 'undefined') {
+    try {
+      const mp4Data = await encodeMP4WebCodecs(frames, onProgress, addWatermark);
+      const blob = new Blob([mp4Data], { type: 'video/mp4' });
+      onProgress(100);
+      return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
+    } catch (_e) {
+      // H.264 unavailable — try VP8 next
+    }
+
+    // VP8/WebM is intentionally skipped here so the product delivers the MP4
+    // format promised in the marketplace listing.
   }
 
-  // Fallback: serve the AVI directly
-  const blob = new Blob([aviData], { type: 'video/avi' });
-  const url = URL.createObjectURL(blob);
-  const filename = `protovid-export-${Date.now()}.avi`;
+  // 2. Fallback: MJPEG AVI -> backend FFmpeg -> H.264 MP4
+  const { data, ext, mime } = await encodeAVIFallback(frames, onProgress, addWatermark);
+  if (ext !== 'avi' || mime !== 'video/avi') throw new Error('Video conversion failed');
+  onProgress(96);
+  const mp4Data = await transcodeAVIToMP4(data);
+  const blob = new Blob([mp4Data], { type: 'video/mp4' });
   onProgress(100);
-  return { url, filename };
+  return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
 }

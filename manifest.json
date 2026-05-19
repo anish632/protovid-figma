@@ -9,7 +9,7 @@
   "networkAccess": {
     "allowedDomains": [
       "https://api.stripe.com",
-      "https://backend-one-nu-28.vercel.app"
+      "https://protovid.dasgroupllc.com"
     ],
     "reasoning": "License validation via Stripe subscriptions and video encoding via backend API"
   },

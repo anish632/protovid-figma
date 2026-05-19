@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) throw new Error('STRIPE_SECRET_KEY not configured');
   return new Stripe(key, {
     apiVersion: '2026-01-28.clover',
@@ -49,7 +49,7 @@ export async function createPortalSession(customerId: string, returnUrl: string)
 
 export function verifyWebhook(body: string, signature: string): Stripe.Event {
   const stripe = getStripe();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   
   if (!secret) {
     throw new Error('STRIPE_WEBHOOK_SECRET not configured');

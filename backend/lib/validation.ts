@@ -11,11 +11,13 @@ export const emailSchema = z.string()
   .max(254, 'Email too long') // RFC 5321 limit
   .transform(email => email.toLowerCase().trim());
 
-// License key validation
+// Legacy field validation.
+// The request field is still named "licenseKey" for compatibility, but the
+// production value is the user's email address.
 export const licenseKeySchema = z.string()
-  .min(1, 'License key is required')
-  .max(255, 'License key too long')
-  .regex(/^[a-zA-Z0-9@._-]+$/, 'Invalid license key format');
+  .min(1, 'Email is required')
+  .max(255, 'Email is too long')
+  .regex(/^[a-zA-Z0-9@._-]+$/, 'Invalid email format');
 
 // API key validation
 export const apiKeySchema = z.string()
@@ -26,10 +28,29 @@ export const apiKeySchema = z.string()
 // Event type validation
 export const eventTypeSchema = z.enum([
   'plugin_load',
-  'export',
-  'checkout_start',
+  'first_open',
+  'onboarding_started',
+  'onboarding_completed',
+  'first_action_completed',
+  'first_value_reached',
   'email_captured',
-  'license_validation'
+  'export',
+  'export_started',
+  'export_completed',
+  'export_success',
+  'export_blocked',
+  'export_failed',
+  'prototype_detected',
+  'paywall_viewed',
+  'review_prompt_shown',
+  'review_prompt_clicked',
+  'checkout_start',
+  'checkout_opened',
+  'checkout_error',
+  'subscription_started',
+  'license_validate',
+  'license_validation',
+  'payment_confirmed'
 ]);
 
 // Plugin version validation
@@ -86,7 +107,7 @@ export const metadataSchema = z.record(
 
 // Request validation schemas
 export const trackingRequestSchema = z.object({
-  email: emailSchema.optional(),
+  email: z.union([emailSchema, z.null()]).optional(),
   eventType: eventTypeSchema,
   pluginVersion: pluginVersionSchema.optional(),
   metadata: metadataSchema
@@ -97,7 +118,8 @@ export const licenseValidationRequestSchema = z.object({
 });
 
 export const checkoutRequestSchema = z.object({
-  email: emailSchema
+  email: emailSchema,
+  plan: z.enum(['monthly', 'yearly']).optional()
 });
 
 export const exportCheckRequestSchema = z.object({

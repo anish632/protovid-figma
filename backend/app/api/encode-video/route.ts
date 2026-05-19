@@ -4,11 +4,19 @@ import { writeFile, readFile, unlink } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import path from 'path';
 
-// ffmpeg-static exports the path to the ffmpeg binary
-import ffmpegPath from 'ffmpeg-static';
+import ffmpeg from '@ffmpeg-installer/ffmpeg';
+
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+  return new Response(null, { status: 204, headers: corsHeaders });
 }
 
 export async function POST(request: NextRequest) {
@@ -20,7 +28,10 @@ export async function POST(request: NextRequest) {
     // Read raw AVI binary from request body
     const body = await request.arrayBuffer();
     if (!body || body.byteLength === 0) {
-      return Response.json({ error: 'No video data provided' }, { status: 400 });
+      return Response.json(
+        { error: 'No video data provided' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Write AVI to temp file
@@ -28,13 +39,13 @@ export async function POST(request: NextRequest) {
 
     // Transcode MJPEG AVI → H.264 MP4 via FFmpeg
     await new Promise<void>((resolve, reject) => {
-      if (!ffmpegPath) {
+      if (!ffmpeg.path) {
         reject(new Error('ffmpeg binary not found'));
         return;
       }
 
       execFile(
-        ffmpegPath,
+        ffmpeg.path,
         [
           '-y',                    // Overwrite output
           '-i', inputPath,         // Input AVI
@@ -44,7 +55,7 @@ export async function POST(request: NextRequest) {
           '-preset', 'ultrafast', // Fastest encoding (small files, fine quality)
           outputPath,
         ],
-        { timeout: 8000 },       // 8s timeout (Vercel Hobby = 10s)
+        { timeout: 25000 },
         (error, _stdout, stderr) => {
           if (error) {
             console.error('FFmpeg stderr:', stderr);
@@ -63,14 +74,14 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'video/mp4',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
       },
     });
   } catch (error) {
     console.error('Transcode error:', error);
     return Response.json(
       { error: error instanceof Error ? error.message : 'Transcoding failed' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   } finally {
     // Clean up temp files

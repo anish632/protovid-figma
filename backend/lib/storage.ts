@@ -26,7 +26,6 @@ export interface Subscription {
 
 export async function getSubscription(email: string): Promise<Subscription> {
   const sql = getDB();
-  const sql = getDB();
   const normalized = email.toLowerCase().trim();
   
   const result = await sql`
