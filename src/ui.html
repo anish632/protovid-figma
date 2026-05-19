@@ -263,6 +263,40 @@
       margin-bottom: 12px;
     }
 
+    .aha-card, .empty-state {
+      text-align: center;
+    }
+
+    .value-pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .warning-pill {
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .trust-copy {
+      text-align: center;
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+
+    .muted {
+      margin-top: 12px;
+      margin-bottom: 0;
+      color: #999;
+    }
+
     .alert-upgrade {
       background: linear-gradient(135deg, #fef3c7, #fde68a);
       border: 1px solid #f59e0b;
@@ -290,6 +324,19 @@
       text-align: center;
     }
 
+    .review-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 14px;
+      text-align: center;
+    }
+
+    .review-card .btn-small {
+      margin-bottom: 0;
+    }
+
     input[type="email"] {
       width: 100%;
       padding: 10px 12px;
@@ -304,6 +351,86 @@
       outline: none;
       border-color: #4a90e2;
       box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+
+    .upgrade-section {
+      background: linear-gradient(135deg, #fefce8, #fef9c3);
+      border: 1px solid #fbbf24;
+    }
+
+    .pricing-toggle {
+      display: flex;
+      gap: 6px;
+    }
+
+    .export-meta {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 14px 0;
+      text-align: left;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+
+    .meta-row + .meta-row {
+      border-top: 1px solid #f1f3f5;
+    }
+
+    .meta-label {
+      color: #6c757d;
+      font-weight: 500;
+    }
+
+    .meta-value {
+      color: #1a1a1a;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+      font-size: 11px;
+      max-width: 65%;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-steps {
+      text-align: left;
+      margin: 14px 0;
+    }
+
+    .empty-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .empty-step + .empty-step {
+      border-top: 1px solid #f1f3f5;
+    }
+
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
     }
   </style>
 </head>
