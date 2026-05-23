@@ -490,7 +490,6 @@ async function handleOpenCheckout(email: string, plan?: string) {
   try {
     const selectedPlan = plan || 'monthly';
     trackEvent('checkout_start', { email, plan: selectedPlan });
-    trackEvent('subscription_started', { email, plan: selectedPlan });
 
     await saveEmail(email.toLowerCase().trim());
 

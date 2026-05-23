@@ -1,7 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { neon } from '@neondatabase/serverless';
 import { verifyWebhook } from '@/lib/stripe';
 import { setSubscription, findSubscriptionByCustomerId, findSubscriptionBySubscriptionId } from '@/lib/storage';
 import Stripe from 'stripe';
+
+function getDB() {
+  if (!process.env.NEON_DATABASE_URL) {
+    throw new Error('Database not configured');
+  }
+  return neon(process.env.NEON_DATABASE_URL);
+}
+
+async function recordEvent(email: string, eventType: string, metadata: Record<string, unknown> = {}) {
+  const sql = getDB();
+  await sql`
+    INSERT INTO protovid_events (
+      email,
+      event_type,
+      plugin_version,
+      metadata,
+      created_at
+    ) VALUES (
+      ${email.toLowerCase().trim()},
+      ${eventType},
+      ${'webhook'},
+      ${Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null},
+      CURRENT_TIMESTAMP
+    )
+  `;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +62,18 @@ export async function POST(request: NextRequest) {
           status: 'active',
           stripeCustomerId: session.customer as string,
           stripeSubscriptionId: session.subscription as string,
+        });
+        await recordEvent(email, 'subscription_started', {
+          source: 'stripe_webhook',
+          event: 'checkout.session.completed',
+          stripe_session_id: session.id,
+          stripe_subscription_id: session.subscription as string | null,
+        });
+        await recordEvent(email, 'payment_confirmed', {
+          source: 'stripe_webhook',
+          event: 'checkout.session.completed',
+          stripe_session_id: session.id,
+          stripe_subscription_id: session.subscription as string | null,
         });
         break;
       }
