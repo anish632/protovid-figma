@@ -53,6 +53,8 @@ npm run build
 
 Verify:
 
+- Blank/no-prototype state shows the sample MP4 outcome card
+- Scan Prototype refreshes the page state after prototype connections are added
 - Free tier allows exactly 1 export per month
 - Free tier is limited to 720p
 - Free exports are watermarked

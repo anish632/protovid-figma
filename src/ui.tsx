@@ -53,6 +53,8 @@ function App() {
   });
 
   const pollTimerRef = useRef<number | null>(null);
+  const scanReturnStageRef = useRef<AppState['stage']>('setup');
+  const demoStateTrackedRef = useRef(false);
 
   // Stop polling on unmount
   useEffect(() => {
@@ -96,10 +98,13 @@ function App() {
           break;
 
         case 'scan-complete':
+          const scannedFrameCount = msg.data.frames.length;
           setState(prev => ({
             ...prev,
-            stage: 'setup',
-            frameCount: msg.data.frames.length
+            stage: scanReturnStageRef.current === 'email-gate' ? 'email-gate' : 'setup',
+            hasPrototype: scannedFrameCount > 0,
+            frameCount: scannedFrameCount,
+            error: scannedFrameCount > 0 ? null : 'No prototype connections found yet.'
           }));
           break;
 
@@ -184,6 +189,26 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const isNoPrototypeSurface =
+      !state.hasPrototype && (state.stage === 'email-gate' || state.stage === 'setup');
+    if (!isNoPrototypeSurface || demoStateTrackedRef.current) return;
+
+    demoStateTrackedRef.current = true;
+    parent.postMessage({
+      pluginMessage: {
+        type: 'track-event',
+        data: {
+          eventType: 'demo_state_shown',
+          metadata: {
+            surface: state.stage,
+            reason: 'no_prototype'
+          }
+        }
+      }
+    }, '*');
+  }, [state.hasPrototype, state.stage]);
+
   // Auto-poll for payment completion after checkout
   const startPaymentPolling = (email: string) => {
     setState(prev => ({ ...prev, stage: 'checking-payment' }));
@@ -262,6 +287,12 @@ function App() {
     }, '*');
   };
 
+  const handleScanPrototype = () => {
+    scanReturnStageRef.current = state.stage;
+    setState(prev => ({ ...prev, stage: 'scanning', error: null }));
+    parent.postMessage({ pluginMessage: { type: 'scan-prototype' } }, '*');
+  };
+
   const handleOpenCheckout = () => {
     const email = state.userEmail;
     if (!email || !email.includes('@')) {
@@ -287,6 +318,33 @@ function App() {
   const remainingExports = state.freeLimit - state.exportCount;
   const canExport = state.isPremium || remainingExports > 0;
   const freeUsed = !state.isPremium && state.exportCount >= state.freeLimit;
+
+  const samplePreview = (
+    <div class="sample-preview">
+      <div class="sample-header">
+        <span>Sample MP4 outcome</span>
+        <strong>8s</strong>
+      </div>
+      <div class="sample-flow" aria-hidden="true">
+        <div class="sample-frame active">
+          <span>Start</span>
+        </div>
+        <div class="sample-arrow"></div>
+        <div class="sample-frame">
+          <span>Flow</span>
+        </div>
+        <div class="sample-arrow"></div>
+        <div class="sample-frame">
+          <span>Done</span>
+        </div>
+      </div>
+      <div class="sample-meta">
+        <span>4 frames</span>
+        <span>720p MP4</span>
+        <span>Ready to share</span>
+      </div>
+    </div>
+  );
 
   return (
     <div class="container">
@@ -342,6 +400,7 @@ function App() {
             <div class="section empty-state">
               <div class="value-pill warning-pill">No prototype found</div>
               <h3>Connect your frames first</h3>
+              {samplePreview}
               <p class="small" style="margin-bottom: 4px;">ProtoVid exports frames linked by prototype interactions. Here's how to set one up:</p>
               <div class="empty-steps">
                 <div class="empty-step">
@@ -358,18 +417,33 @@ function App() {
                 </div>
                 <div class="empty-step">
                   <span class="step-num">4</span>
-                  <span>Reopen ProtoVid to export</span>
+                  <span>Click <strong>Scan Prototype</strong> to refresh</span>
                 </div>
               </div>
               <button
-                onClick={handleClosePlugin}
-                class="btn btn-secondary btn-large"
+                onClick={handleScanPrototype}
+                class="btn btn-primary btn-large"
                 style="margin-top: 4px;"
               >
-                Go Set Up Prototype
+                Scan Prototype
+              </button>
+              <button
+                onClick={handleClosePlugin}
+                class="btn btn-secondary btn-large"
+                style="margin-top: 8px;"
+              >
+                Close Plugin
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {state.stage === 'scanning' && (
+        <div class="loading">
+          <div class="spinner"></div>
+          <h3>Scanning prototype...</h3>
+          <p class="small" style="margin-top: 8px;">Checking this page for connected frames.</p>
         </div>
       )}
 
@@ -388,6 +462,7 @@ function App() {
           {!state.hasPrototype && (
             <div class="alert alert-warning">
               <p style="font-weight: 600; margin-bottom: 8px;">No prototype found on this page.</p>
+              {samplePreview}
               <div class="empty-steps" style="margin: 0;">
                 <div class="empty-step" style="padding: 6px 0;">
                   <span class="step-num">1</span>
@@ -402,6 +477,13 @@ function App() {
                   <span>Click <strong>Scan Prototype</strong> below to refresh</span>
                 </div>
               </div>
+              <button
+                onClick={handleScanPrototype}
+                class="btn btn-primary btn-large"
+                style="margin-top: 10px;"
+              >
+                Scan Prototype
+              </button>
             </div>
           )}
 

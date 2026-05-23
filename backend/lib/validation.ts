@@ -33,6 +33,7 @@ export const eventTypeSchema = z.enum([
   'onboarding_completed',
   'first_action_completed',
   'first_value_reached',
+  'demo_state_shown',
   'email_captured',
   'export',
   'export_started',

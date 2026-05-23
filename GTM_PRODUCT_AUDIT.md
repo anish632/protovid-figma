@@ -89,9 +89,17 @@ Stripe subscription via `/api/billing/checkout`. Auto-detected via 60s payment p
 
 ---
 
+## Changes made in this release (2026-05-22)
+
+### No-prototype activation path
+- Added a compact sample MP4 outcome card to the blank/no-prototype state so cold users see the expected artifact before setup.
+- Added a visible **Scan Prototype** CTA to the no-prototype path; the UI previously referenced this action without rendering the button.
+- Fixed `scan-complete` so a successful rescan sets `hasPrototype` and unlocks the normal export setup instead of leaving users stuck in the empty state.
+- Added `demo_state_shown` analytics so `/api/stats` can measure how many sessions hit the no-prototype proof state before first value.
+
 ## Funnel gaps (not yet fixed — backlog)
 
-1. **No demo/sample state**: Users opening the plugin on a blank page see the empty state immediately and may close without understanding the value. A static demo GIF or animated preview in the email-gate would help. Requires embedding an asset — deferred.
+1. **No true video demo asset**: The plugin now shows a lightweight sample MP4 outcome card in the blank state, but it still does not include a real demo video/GIF asset. A static demo GIF or animated preview may help once the current proof-state exposure is measured.
 
 2. **Free tier limit is 1/month**: This is very tight. A 2-export/month free tier with a harder paywall at export 3 may convert better, but needs A/B data. Do not change without measuring the current conversion rate first.
 
