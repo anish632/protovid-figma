@@ -11,7 +11,6 @@ interface FrameInput {
 
 interface EncodeSettings {
   format: 'mp4';
-  frameRate: 30 | 60;
 }
 
 type ProgressCallback = (percent: number) => void;
@@ -248,7 +247,7 @@ async function transcodeAVIToMP4(data: Uint8Array): Promise<Uint8Array> {
   const response = await fetch(`${BACKEND_URL}/api/encode-video`, {
     method: 'POST',
     headers: { 'Content-Type': 'video/avi' },
-    body: data,
+    body: data.buffer as ArrayBuffer,
   });
 
   if (!response.ok) {
@@ -288,7 +287,7 @@ export async function encodeVideo(
   if (typeof VideoEncoder !== 'undefined') {
     try {
       const mp4Data = await encodeMP4WebCodecs(frames, onProgress, addWatermark);
-      const blob = new Blob([mp4Data], { type: 'video/mp4' });
+      const blob = new Blob([mp4Data as unknown as BlobPart], { type: 'video/mp4' });
       onProgress(100);
       return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
     } catch (_e) {
@@ -304,7 +303,7 @@ export async function encodeVideo(
   if (ext !== 'avi' || mime !== 'video/avi') throw new Error('Video conversion failed');
   onProgress(96);
   const mp4Data = await transcodeAVIToMP4(data);
-  const blob = new Blob([mp4Data], { type: 'video/mp4' });
+  const blob = new Blob([mp4Data as unknown as BlobPart], { type: 'video/mp4' });
   onProgress(100);
   return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
 }

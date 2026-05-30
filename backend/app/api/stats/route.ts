@@ -90,11 +90,29 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'export_completed') as export_completed_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'review_prompt_shown') as review_prompt_shown_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'review_prompt_clicked') as review_prompt_clicked_users,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'pricing_variant_assigned') as pricing_variant_assigned_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_start') as checkout_start_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_opened') as checkout_opened_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'payment_confirmed') as payment_confirmed_users
       FROM protovid_events
       WHERE created_at >= ${last30d}
+    `;
+
+    // Pricing experiment summary (last 30 days)
+    const pricingExperiment = await sql`
+      SELECT
+        COALESCE(metadata::jsonb->>'pricingVariant', metadata::jsonb->>'pricing_variant', 'unknown') as pricing_variant,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'pricing_variant_assigned') as assigned_users,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'paywall_viewed') as paywall_viewed_users,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_opened') as checkout_opened_users,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'payment_confirmed') as payment_confirmed_users,
+        COALESCE(MAX((metadata::jsonb->>'amountCents')::integer), MAX((metadata::jsonb->>'amount_cents')::integer), 0) as amount_cents,
+        COALESCE(MAX(metadata::jsonb->>'priceLabel'), MAX(metadata::jsonb->>'price_label'), '') as price_label
+      FROM protovid_events
+      WHERE created_at >= ${last30d}
+        AND event_type IN ('pricing_variant_assigned', 'paywall_viewed', 'checkout_opened', 'payment_confirmed')
+      GROUP BY pricing_variant
+      ORDER BY pricing_variant ASC
     `;
 
     // Free-tier pressure from persistent subscription rows
@@ -155,10 +173,20 @@ export async function GET(request: NextRequest) {
         exportCompletedUsers: parseInt(funnelSummary.export_completed_users || '0'),
         reviewPromptShownUsers: parseInt(funnelSummary.review_prompt_shown_users || '0'),
         reviewPromptClickedUsers: parseInt(funnelSummary.review_prompt_clicked_users || '0'),
+        pricingVariantAssignedUsers: parseInt(funnelSummary.pricing_variant_assigned_users || '0'),
         checkoutStartUsers: parseInt(funnelSummary.checkout_start_users || '0'),
         checkoutOpenedUsers: parseInt(funnelSummary.checkout_opened_users || '0'),
         paymentConfirmedUsers: parseInt(funnelSummary.payment_confirmed_users || '0'),
       },
+      pricingExperiment30d: pricingExperiment.map((row: any) => ({
+        pricingVariant: row.pricing_variant,
+        priceLabel: row.price_label,
+        amountCents: parseInt(row.amount_cents || '0'),
+        assignedUsers: parseInt(row.assigned_users || '0'),
+        paywallViewedUsers: parseInt(row.paywall_viewed_users || '0'),
+        checkoutOpenedUsers: parseInt(row.checkout_opened_users || '0'),
+        paymentConfirmedUsers: parseInt(row.payment_confirmed_users || '0'),
+      })),
       freeTier30d: {
         freeLimit: FREE_TIER_EXPORT_LIMIT,
         trackedFreeUsersThisMonth: parseInt(freeTierPressure.tracked_free_users_this_month || '0'),

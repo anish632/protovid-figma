@@ -4,6 +4,8 @@ import { FREE_TIER_EXPORT_LIMIT, PRO_TIER_EXPORT_LIMIT, isPremiumSubscription } 
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 import { withRateLimit, generalRateLimit } from '@/lib/rateLimit';
 
+const FREE_TRIAL_DAYS = 7;
+
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200 });
 }
@@ -22,6 +24,15 @@ async function handlePOST(request: NextRequest) {
     }
     const currentMonth = new Date().toISOString().slice(0, 7);
     const exportsThisMonth = subscription.lastResetMonth === currentMonth ? subscription.exportsThisMonth : 0;
+    
+    // Check if trial period has expired (7 days from first export)
+    let trialExpired = false;
+    if (subscription.firstExportDate) {
+      const firstExportDate = new Date(subscription.firstExportDate);
+      const today = new Date();
+      const daysSinceFirstExport = Math.floor((today.getTime() - firstExportDate.getTime()) / (1000 * 60 * 60 * 24));
+      trialExpired = daysSinceFirstExport >= FREE_TRIAL_DAYS;
+    }
 
     if (subscription.lastResetMonth !== currentMonth) {
       await setSubscription(email, {
@@ -30,11 +41,18 @@ async function handlePOST(request: NextRequest) {
       });
     }
 
+    // Can export if: under export limit AND trial not expired
+    const canExport = exportsThisMonth < FREE_TIER_EXPORT_LIMIT && !trialExpired;
+
     return NextResponse.json({
-      canExport: exportsThisMonth < FREE_TIER_EXPORT_LIMIT,
+      canExport,
       exportsThisMonth,
       limit: FREE_TIER_EXPORT_LIMIT,
       isPremium: false,
+      trialExpired,
+      daysSinceFirstExport: subscription.firstExportDate 
+        ? Math.floor((new Date().getTime() - new Date(subscription.firstExportDate).getTime()) / (1000 * 60 * 60 * 24))
+        : null,
     });
   } catch (error) {
     console.error('Export check error:', error);
@@ -44,6 +62,7 @@ async function handlePOST(request: NextRequest) {
         exportsThisMonth: FREE_TIER_EXPORT_LIMIT,
         limit: FREE_TIER_EXPORT_LIMIT,
         isPremium: false,
+        trialExpired: true,
         error: sanitizeError(error)
       },
       { status: 500 }

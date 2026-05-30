@@ -13,11 +13,11 @@ export async function createCheckoutSession(params: {
   customerEmail: string;
   successUrl: string;
   cancelUrl: string;
+  metadata?: Record<string, string>;
 }) {
   const stripe = getStripe();
   
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
     customer_email: params.customerEmail,
     line_items: [
       {
@@ -30,6 +30,7 @@ export async function createCheckoutSession(params: {
     cancel_url: params.cancelUrl,
     metadata: {
       email: params.customerEmail,
+      ...params.metadata,
     },
   });
 
@@ -45,6 +46,11 @@ export async function createPortalSession(customerId: string, returnUrl: string)
   });
 
   return session.url;
+}
+
+export async function retrieveCheckoutSession(sessionId: string) {
+  const stripe = getStripe();
+  return stripe.checkout.sessions.retrieve(sessionId);
 }
 
 export function verifyWebhook(body: string, signature: string): Stripe.Event {

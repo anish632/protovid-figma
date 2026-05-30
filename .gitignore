@@ -4,6 +4,8 @@ dist/
 *.log
 .env
 .env.local
+.env.vercel-pulled
+*.vercel-pulled
 .vercel
 
 backend/.next/

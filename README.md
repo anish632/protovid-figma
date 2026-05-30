@@ -71,6 +71,7 @@ The active backend lives in `backend/app/api` and handles:
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `PROTOVID_PRICE_ID` | Stripe monthly subscription price ID |
+| `PROTOVID_MONTHLY_5_PRICE_ID` | Stripe monthly $5/mo experiment price ID |
 | `PROTOVID_YEARLY_PRICE_ID` | Stripe yearly subscription price ID |
 | `NEXT_PUBLIC_APP_URL` | Public backend app URL used for Stripe redirects |
 | `NEON_DATABASE_URL` | Neon Postgres connection string |

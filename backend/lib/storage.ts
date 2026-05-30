@@ -22,6 +22,7 @@ export interface Subscription {
   currentPeriodEnd?: string;
   exportsThisMonth: number;
   lastResetMonth: string;
+  firstExportDate?: string;
 }
 
 export async function getSubscription(email: string): Promise<Subscription> {
@@ -37,7 +38,8 @@ export async function getSubscription(email: string): Promise<Subscription> {
       stripe_subscription_id as "stripeSubscriptionId",
       current_period_end as "currentPeriodEnd",
       exports_this_month as "exportsThisMonth",
-      last_reset_month as "lastResetMonth"
+      last_reset_month as "lastResetMonth",
+      first_export_date as "firstExportDate"
     FROM protovid_subscriptions
     WHERE email = ${normalized}
   `;
@@ -50,6 +52,7 @@ export async function getSubscription(email: string): Promise<Subscription> {
       status: 'active',
       exportsThisMonth: 0,
       lastResetMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+      firstExportDate: undefined,
     };
   }
   
@@ -63,6 +66,7 @@ export async function getSubscription(email: string): Promise<Subscription> {
     currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
     exportsThisMonth: row.exportsThisMonth,
     lastResetMonth: row.lastResetMonth,
+    firstExportDate: row.firstExportDate || undefined,
   };
 }
 
@@ -82,6 +86,7 @@ export async function setSubscription(email: string, data: Partial<Subscription>
       current_period_end,
       exports_this_month,
       last_reset_month,
+      first_export_date,
       updated_at
     ) VALUES (
       ${merged.email},
@@ -92,6 +97,7 @@ export async function setSubscription(email: string, data: Partial<Subscription>
       ${merged.currentPeriodEnd ? new Date(merged.currentPeriodEnd) : null},
       ${merged.exportsThisMonth},
       ${merged.lastResetMonth},
+      ${merged.firstExportDate ? new Date(merged.firstExportDate) : null},
       CURRENT_TIMESTAMP
     )
     ON CONFLICT (email) DO UPDATE SET
@@ -102,6 +108,7 @@ export async function setSubscription(email: string, data: Partial<Subscription>
       current_period_end = EXCLUDED.current_period_end,
       exports_this_month = EXCLUDED.exports_this_month,
       last_reset_month = EXCLUDED.last_reset_month,
+      first_export_date = EXCLUDED.first_export_date,
       updated_at = CURRENT_TIMESTAMP
   `;
 }
@@ -172,11 +179,17 @@ export async function incrementExportCount(email: string): Promise<Subscription>
   const sql = getDB();
   const sub = await getSubscription(email);
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const today = new Date().toISOString().slice(0, 10);
   
   // Reset exports if new month
   if (sub.lastResetMonth !== currentMonth) {
     sub.exportsThisMonth = 0;
     sub.lastResetMonth = currentMonth;
+  }
+  
+  // Set first export date if not already set
+  if (!sub.firstExportDate) {
+    sub.firstExportDate = today;
   }
   
   sub.exportsThisMonth += 1;
