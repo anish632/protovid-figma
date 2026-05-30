@@ -1,8 +1,7 @@
 // ProtoVid - Main Plugin Code (runs in Figma sandbox)
 
-interface ExportSettings {
+interface ProtoVidExportSettings {
   resolution: '720p' | '1080p' | '4K';
-  frameRate: 30 | 60;
   format: 'mp4';
   showCursor: boolean;
   licenseKey?: string;
@@ -17,9 +16,8 @@ interface PrototypeFrame {
 }
 
 // State
-let currentSettings: ExportSettings = {
+let currentSettings: ProtoVidExportSettings = {
   resolution: '720p',
-  frameRate: 30,
   format: 'mp4',
   showCursor: true
 };
@@ -29,9 +27,12 @@ const FREE_TIER_LIMIT = 1;
 let freeTierLimit = FREE_TIER_LIMIT;
 const PLUGIN_VERSION = '1.0.0';
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
+const FREE_TRIAL_DAYS = 7;
 let exportInProgress = false;
 let currentExportCharged = false;
 let currentExportCommitted = false;
+let trialExpired = false;
+let daysSinceFirstExport: number | null = null;
 
 // ---- Email persistence ----
 async function loadEmail(): Promise<string | null> {
@@ -70,7 +71,7 @@ async function trackEvent(eventType: string, metadata?: any) {
 }
 
 // ---- Server-side export check ----
-async function checkServerExports(email: string): Promise<{ canExport: boolean; exportsThisMonth: number; limit: number; isPremium: boolean } | null> {
+async function checkServerExports(email: string): Promise<{ canExport: boolean; exportsThisMonth: number; limit: number; isPremium: boolean; trialExpired?: boolean; daysSinceFirstExport?: number | null } | null> {
   try {
     const response = await fetch(`${BACKEND_URL}/api/exports/check`, {
       method: 'POST',
@@ -165,7 +166,7 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
         break;
 
       case 'export-video':
-        await handleExportVideo(msg.data);
+        await handleExportVideo(msg.data as ProtoVidExportSettings);
         break;
 
       case 'validate-license':
@@ -187,7 +188,11 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
         break;
 
       case 'open-checkout':
-        await handleOpenCheckout(msg.data.email, msg.data.plan);
+        await handleOpenCheckout(msg.data.email, msg.data.plan, {
+          pricingVariant: msg.data.pricingVariant,
+          priceLabel: msg.data.priceLabel,
+          amountCents: msg.data.amountCents
+        });
         break;
 
       case 'open-billing-portal':
@@ -235,6 +240,8 @@ async function handleSaveEmail(email: string) {
   if (serverStatus) {
     exportCount = serverStatus.isPremium ? 0 : Math.max(exportCount, serverStatus.exportsThisMonth);
     freeTierLimit = serverStatus.limit;
+    trialExpired = serverStatus.trialExpired || false;
+    daysSinceFirstExport = serverStatus.daysSinceFirstExport || null;
     await saveExportCount(exportCount);
   }
 
@@ -244,7 +251,9 @@ async function handleSaveEmail(email: string) {
       email: normalized,
       exportCount,
       freeLimit: freeTierLimit,
-      isPremium: serverStatus?.isPremium ?? false
+      isPremium: serverStatus?.isPremium ?? false,
+      trialExpired,
+      daysSinceFirstExport
     }
   });
 }
@@ -279,6 +288,8 @@ async function handleInit() {
     if (serverStatus) {
       exportCount = serverStatus.isPremium ? 0 : Math.max(exportCount, serverStatus.exportsThisMonth);
       freeTierLimit = serverStatus.limit;
+      trialExpired = serverStatus.trialExpired || false;
+      daysSinceFirstExport = serverStatus.daysSinceFirstExport ?? null;
       await saveExportCount(exportCount);
       serverPremium = serverStatus.isPremium;
     }
@@ -292,7 +303,9 @@ async function handleInit() {
       exportCount,
       freeLimit: freeTierLimit,
       savedEmail,
-      isPremium: serverPremium
+      isPremium: serverPremium,
+      trialExpired,
+      daysSinceFirstExport
     }
   });
 }
@@ -323,7 +336,7 @@ async function handleScanPrototype() {
 }
 
 // Main export function
-async function handleExportVideo(settings: ExportSettings) {
+async function handleExportVideo(settings: ProtoVidExportSettings) {
   if (exportInProgress) {
     figma.ui.postMessage({
       type: 'error',
@@ -347,21 +360,21 @@ async function handleExportVideo(settings: ExportSettings) {
   // Track export attempt
   trackEvent('export_started', {
     resolution: settings.resolution,
-    frameRate: settings.frameRate,
     hasLicense: !!email
   });
   trackEvent('export', {
     resolution: settings.resolution,
-    frameRate: settings.frameRate,
     hasLicense: !!email
   });
 
-  let serverStatus: { canExport: boolean; exportsThisMonth: number; limit: number; isPremium: boolean } | null = null;
+  let serverStatus: { canExport: boolean; exportsThisMonth: number; limit: number; isPremium: boolean; trialExpired?: boolean; daysSinceFirstExport?: number | null } | null = null;
   if (email) {
     serverStatus = await checkServerExports(email);
     if (serverStatus) {
       exportCount = serverStatus.isPremium ? 0 : Math.max(exportCount, serverStatus.exportsThisMonth);
       freeTierLimit = serverStatus.limit;
+      trialExpired = serverStatus.trialExpired || false;
+      daysSinceFirstExport = serverStatus.daysSinceFirstExport ?? null;
       await saveExportCount(exportCount);
     }
   }
@@ -372,26 +385,34 @@ async function handleExportVideo(settings: ExportSettings) {
 
   if (!isPremium) {
     // Server-side check first, fall back to clientStorage
-    const canExport = serverStatus?.canExport ?? exportCount < freeTierLimit;
+    const canExport = serverStatus?.canExport ?? (exportCount < freeTierLimit && !trialExpired);
 
     if (!canExport) {
+      const reason = trialExpired ? 'trial_expired' : 'free_limit';
       trackEvent('export_blocked', {
-        reason: 'free_limit',
+        reason,
         exportCount,
-        freeLimit: freeTierLimit
+        freeLimit: freeTierLimit,
+        trialExpired,
+        daysSinceFirstExport
       });
       trackEvent('paywall_viewed', {
-        trigger: 'free_limit_reached',
+        trigger: trialExpired ? 'trial_expired' : 'free_limit_reached',
         exportCount,
-        freeLimit: freeTierLimit
+        freeLimit: freeTierLimit,
+        daysSinceFirstExport
       });
       figma.ui.postMessage({
-        type: 'error',
-        data: { message: 'Free export used this month. Your next free export resets on the 1st of next month.' }
-      });
-      figma.ui.postMessage({
-        type: 'export-count-updated',
-        data: { exportCount }
+        type: 'free-limit-reached',
+        data: {
+          exportCount,
+          freeLimit: freeTierLimit,
+          trialExpired,
+          daysSinceFirstExport,
+          message: trialExpired 
+            ? `Your free trial has expired after ${daysSinceFirstExport} days. Upgrade to keep exporting.`
+            : 'Free export used this month. Upgrade to keep exporting MP4s today.'
+        }
       });
       finishWithoutEncoding();
       return;
@@ -405,19 +426,6 @@ async function handleExportVideo(settings: ExportSettings) {
       figma.ui.postMessage({
         type: 'error',
         data: { message: 'HD/4K export requires Premium. Please upgrade or select 720p.' }
-      });
-      finishWithoutEncoding();
-      return;
-    }
-
-    if (settings.frameRate !== 30) {
-      trackEvent('export_blocked', {
-        reason: 'premium_framerate',
-        frameRate: settings.frameRate
-      });
-      figma.ui.postMessage({
-        type: 'error',
-        data: { message: 'This frame-rate setting is not available yet. Please export with the default settings.' }
       });
       finishWithoutEncoding();
       return;
@@ -486,10 +494,10 @@ async function handleValidateLicense(licenseKey: string) {
   });
 }
 
-async function handleOpenCheckout(email: string, plan?: string) {
+async function handleOpenCheckout(email: string, plan?: string, pricingMetadata: Record<string, unknown> = {}) {
   try {
     const selectedPlan = plan || 'monthly';
-    trackEvent('checkout_start', { email, plan: selectedPlan });
+    trackEvent('checkout_start', { email, plan: selectedPlan, ...pricingMetadata });
 
     await saveEmail(email.toLowerCase().trim());
 
@@ -502,7 +510,12 @@ async function handleOpenCheckout(email: string, plan?: string) {
     if (response.ok) {
       const data = await response.json();
       if (data.url) {
-        trackEvent('checkout_opened', { plan: selectedPlan });
+        trackEvent('checkout_opened', {
+          plan: selectedPlan,
+          pricingVariant: data.pricingVariant || pricingMetadata.pricingVariant,
+          priceLabel: data.priceLabel || pricingMetadata.priceLabel,
+          amountCents: data.amountCents || pricingMetadata.amountCents
+        });
         figma.openExternal(data.url);
         figma.notify('Opening checkout... We\'ll detect your payment automatically.');
         figma.ui.postMessage({
@@ -600,17 +613,14 @@ async function handleEncodingComplete(isPremium: boolean) {
   exportInProgress = false;
   trackEvent('first_value_reached', {
     resolution: currentSettings.resolution,
-    frameRate: currentSettings.frameRate,
     isPremium
   });
   trackEvent('export_completed', {
     resolution: currentSettings.resolution,
-    frameRate: currentSettings.frameRate,
     isPremium
   });
   trackEvent('export_success', {
     resolution: currentSettings.resolution,
-    frameRate: currentSettings.frameRate,
     isPremium
   });
   trackEvent('review_prompt_shown', {
@@ -687,7 +697,7 @@ async function buildPrototypeGraph(): Promise<{
 // Capture frames from prototype flow
 async function capturePrototypeFrames(
   startFrame: FrameNode,
-  settings: ExportSettings
+  settings: ProtoVidExportSettings
 ): Promise<PrototypeFrame[]> {
   const { edges, allFrameIds } = await buildPrototypeGraph();
   const frames: PrototypeFrame[] = [];
@@ -710,8 +720,8 @@ async function capturePrototypeFrames(
     try {
       const scale = Math.min(calculateScale(frame, targetRes), 4);
       const imageData = await frame.exportAsync({
-        format: 'PNG',
-        constraint: { type: 'SCALE', value: scale }
+        format: 'PNG' as const,
+        constraint: { type: 'SCALE' as const, value: scale }
       });
 
       frames.push({

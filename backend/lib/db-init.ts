@@ -38,11 +38,23 @@ async function initDatabase() {
     `;
     
     await sql`
-      CREATE INDEX IF NOT EXISTS idx_protovid_stripe_subscription 
+      CREATE INDEX IF NOT EXISTS idx_protovid_stripe_subscription
       ON protovid_subscriptions(stripe_subscription_id)
     `;
-    
+
     console.log('✅ Created indexes for Stripe lookups');
+
+    // Stablecoin payment columns — idempotent, safe to re-run
+    await sql`ALTER TABLE protovid_subscriptions ADD COLUMN IF NOT EXISTS crypto_charge_id VARCHAR(255)`;
+    await sql`ALTER TABLE protovid_subscriptions ADD COLUMN IF NOT EXISTS crypto_paid_at TIMESTAMP`;
+    await sql`ALTER TABLE protovid_subscriptions ADD COLUMN IF NOT EXISTS crypto_expires_at TIMESTAMP`;
+
+    console.log('✅ Ensured stablecoin columns on protovid_subscriptions');
+
+    // Trial tracking columns
+    await sql`ALTER TABLE protovid_subscriptions ADD COLUMN IF NOT EXISTS first_export_date DATE`;
+
+    console.log('✅ Ensured trial tracking columns on protovid_subscriptions');
     
     // Test query
     const result = await sql`SELECT COUNT(*) as count FROM protovid_subscriptions`;

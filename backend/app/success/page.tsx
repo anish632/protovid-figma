@@ -1,4 +1,13 @@
-export default function SuccessPage() {
+import { SuccessConfirmation } from './SuccessConfirmation';
+
+export default async function SuccessPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ session_id?: string }>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const sessionId = params?.session_id;
+
   return (
     <main style={{
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
@@ -9,6 +18,7 @@ export default function SuccessPage() {
       lineHeight: 1.5,
     }}>
       <h1 style={{ fontSize: 36, marginBottom: 12 }}>ProtoVid Pro is active</h1>
+      <SuccessConfirmation sessionId={sessionId} />
       <p style={{ color: '#555', fontSize: 18, marginBottom: 24 }}>
         Return to Figma. The ProtoVid plugin will detect your payment and unlock Pro automatically.
       </p>

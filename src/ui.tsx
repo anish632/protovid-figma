@@ -4,16 +4,22 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { encodeVideo } from './encoder';
 
 interface AppState {
-  stage: 'loading' | 'email-gate' | 'setup' | 'scanning' | 'exporting' | 'complete' | 'checking-payment';
+  stage: 'loading' | 'setup' | 'scanning' | 'exporting' | 'complete' | 'checking-payment';
   hasPrototype: boolean;
   frameCount: number;
   exportCount: number;
   freeLimit: number;
   isPremium: boolean;
   userEmail: string;
+  paymentCheckAvailable: boolean;
+  pricingVariant: string;
+  monthlyPriceLabel: string;
+  monthlyAmountCents: number;
+  pricingLoadedEmail: string;
+  trialExpired: boolean;
+  daysSinceFirstExport: number | null;
   settings: {
     resolution: '720p' | '1080p' | '4K';
-    frameRate: 30 | 60;
     format: 'mp4';
     showCursor: boolean;
   };
@@ -37,9 +43,15 @@ function App() {
     freeLimit: 1,
     isPremium: false,
     userEmail: '',
+    paymentCheckAvailable: false,
+    pricingVariant: 'monthly_8',
+    monthlyPriceLabel: '$8/mo',
+    monthlyAmountCents: 800,
+    pricingLoadedEmail: '',
+    trialExpired: false,
+    daysSinceFirstExport: null,
     settings: {
       resolution: '720p',
-      frameRate: 30,
       format: 'mp4',
       showCursor: true
     },
@@ -52,9 +64,14 @@ function App() {
     downloadFilename: null
   });
 
+  // Email is collected just-in-time at checkout (not before the first export).
+  const [needEmail, setNeedEmail] = useState(false);
+
   const pollTimerRef = useRef<number | null>(null);
   const scanReturnStageRef = useRef<AppState['stage']>('setup');
   const demoStateTrackedRef = useRef(false);
+  const paywallViewedRef = useRef(false);
+  const pricingEmailRef = useRef('');
 
   // Stop polling on unmount
   useEffect(() => {
@@ -76,13 +93,15 @@ function App() {
         case 'init-complete':
           setState(prev => ({
             ...prev,
-            stage: msg.data.savedEmail ? 'setup' : 'email-gate',
+            stage: 'setup',
             hasPrototype: msg.data.hasPrototype,
             frameCount: msg.data.frameCount,
             exportCount: msg.data.exportCount,
             freeLimit: msg.data.freeLimit,
             userEmail: msg.data.savedEmail || '',
-            isPremium: msg.data.isPremium || false
+            isPremium: msg.data.isPremium || false,
+            trialExpired: msg.data.trialExpired || false,
+            daysSinceFirstExport: msg.data.daysSinceFirstExport || null
           }));
           break;
 
@@ -93,7 +112,9 @@ function App() {
             userEmail: msg.data.email,
             exportCount: msg.data.exportCount,
             freeLimit: msg.data.freeLimit,
-            isPremium: msg.data.isPremium || false
+            isPremium: msg.data.isPremium || false,
+            trialExpired: msg.data.trialExpired || false,
+            daysSinceFirstExport: msg.data.daysSinceFirstExport || null
           }));
           break;
 
@@ -101,7 +122,7 @@ function App() {
           const scannedFrameCount = msg.data.frames.length;
           setState(prev => ({
             ...prev,
-            stage: scanReturnStageRef.current === 'email-gate' ? 'email-gate' : 'setup',
+            stage: 'setup',
             hasPrototype: scannedFrameCount > 0,
             frameCount: scannedFrameCount,
             error: scannedFrameCount > 0 ? null : 'No prototype connections found yet.'
@@ -178,6 +199,20 @@ function App() {
           startPaymentPolling(msg.data.email);
           break;
 
+        case 'free-limit-reached':
+          setState(prev => ({
+            ...prev,
+            stage: 'setup',
+            exportCount: msg.data.exportCount,
+            freeLimit: msg.data.freeLimit,
+            isPremium: false,
+            trialExpired: msg.data.trialExpired || false,
+            daysSinceFirstExport: msg.data.daysSinceFirstExport || null,
+            paymentCheckAvailable: false,
+            error: null
+          }));
+          break;
+
         case 'error':
           setState(prev => ({
             ...prev,
@@ -190,8 +225,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const isNoPrototypeSurface =
-      !state.hasPrototype && (state.stage === 'email-gate' || state.stage === 'setup');
+    const isNoPrototypeSurface = !state.hasPrototype && state.stage === 'setup';
     if (!isNoPrototypeSurface || demoStateTrackedRef.current) return;
 
     demoStateTrackedRef.current = true;
@@ -208,6 +242,67 @@ function App() {
       }
     }, '*');
   }, [state.hasPrototype, state.stage]);
+
+  useEffect(() => {
+    if (state.isPremium || state.exportCount < state.freeLimit) {
+      paywallViewedRef.current = false;
+      return;
+    }
+    const pricingReady = state.userEmail
+      ? state.pricingLoadedEmail === state.userEmail.toLowerCase().trim()
+      : true;
+    if (!pricingReady) return;
+
+    if (state.stage === 'setup' && !paywallViewedRef.current) {
+      paywallViewedRef.current = true;
+      parent.postMessage({
+        pluginMessage: {
+          type: 'track-event',
+          data: {
+            eventType: 'paywall_viewed',
+            metadata: {
+              trigger: 'free_limit_ui_shown',
+              exportCount: state.exportCount,
+              freeLimit: state.freeLimit,
+              pricingVariant: state.pricingVariant,
+              priceLabel: state.monthlyPriceLabel,
+              amountCents: state.monthlyAmountCents
+            }
+          }
+        }
+      }, '*');
+    }
+  }, [state.isPremium, state.exportCount, state.freeLimit, state.stage, state.userEmail, state.pricingLoadedEmail, state.pricingVariant, state.monthlyPriceLabel, state.monthlyAmountCents]);
+
+  useEffect(() => {
+    const email = state.userEmail.toLowerCase().trim();
+    if (!email || !email.includes('@') || pricingEmailRef.current === email) return;
+
+    pricingEmailRef.current = email;
+    fetch(`${BACKEND_URL}/api/billing/pricing-variant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, plan: 'monthly' })
+    })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        setState(prev => {
+          if (!data?.pricingVariant || !data?.priceLabel) {
+            return { ...prev, pricingLoadedEmail: email };
+          }
+          return {
+            ...prev,
+            pricingVariant: data.pricingVariant,
+            monthlyPriceLabel: data.priceLabel,
+            monthlyAmountCents: data.amountCents || prev.monthlyAmountCents,
+            pricingLoadedEmail: email
+          };
+        });
+      })
+      .catch(() => {
+        setState(prev => ({ ...prev, pricingLoadedEmail: email }));
+      });
+  }, [state.userEmail]);
 
   // Auto-poll for payment completion after checkout
   const startPaymentPolling = (email: string) => {
@@ -257,7 +352,8 @@ function App() {
         setState(prev => ({
           ...prev,
           stage: 'setup',
-          error: null
+          error: null,
+          paymentCheckAvailable: true
         }));
       }
     }, 3000);
@@ -296,15 +392,33 @@ function App() {
   const handleOpenCheckout = () => {
     const email = state.userEmail;
     if (!email || !email.includes('@')) {
-      setState(prev => ({ ...prev, error: 'Please enter your email address first' }));
+      // Reveal the inline email field instead of blocking — we only need an
+      // email to attach the subscription, collected right at checkout.
+      setNeedEmail(true);
+      setState(prev => ({ ...prev, error: 'Enter your email to continue to checkout.' }));
       return;
     }
+    setNeedEmail(false);
+    setState(prev => ({ ...prev, error: null }));
     parent.postMessage({
       pluginMessage: {
         type: 'open-checkout',
-        data: { email, plan: 'monthly' }
+        data: {
+          email,
+          plan: 'monthly',
+          pricingVariant: state.pricingVariant,
+          priceLabel: state.monthlyPriceLabel,
+          amountCents: state.monthlyAmountCents
+        }
       }
     }, '*');
+  };
+
+  const handleManualPaymentCheck = () => {
+    const email = state.userEmail;
+    if (!email || !email.includes('@')) return;
+    setState(prev => ({ ...prev, stage: 'checking-payment', paymentCheckAvailable: false }));
+    startPaymentPolling(email);
   };
 
   const handleClosePlugin = () => {
@@ -318,6 +432,31 @@ function App() {
   const remainingExports = state.freeLimit - state.exportCount;
   const canExport = state.isPremium || remainingExports > 0;
   const freeUsed = !state.isPremium && state.exportCount >= state.freeLimit;
+  const collectEmail = needEmail && !state.isPremium;
+
+  // Inline, just-in-time email capture shown only after a user opts to upgrade.
+  const emailCaptureCard = collectEmail ? (
+    <div class="section aha-card">
+      <p style="font-weight: 600; margin-bottom: 4px; font-size: 13px;">One step to Pro</p>
+      <p class="small trust-copy" style="margin-bottom: 8px;">Enter your email to start checkout. It links your subscription so Pro works on any device.</p>
+      <input
+        type="email"
+        placeholder="you@example.com"
+        value={state.userEmail}
+        onInput={(e) => setState(prev => ({ ...prev, userEmail: e.currentTarget.value }))}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleOpenCheckout(); }}
+        class="license-input"
+        style="margin-bottom: 8px;"
+      />
+      <button
+        onClick={handleOpenCheckout}
+        disabled={!state.userEmail.trim() || !state.userEmail.includes('@')}
+        class="btn btn-upgrade btn-large"
+      >
+        Continue to checkout — {state.monthlyPriceLabel}
+      </button>
+    </div>
+  ) : null;
 
   const samplePreview = (
     <div class="sample-preview">
@@ -366,79 +505,6 @@ function App() {
         </div>
       )}
 
-      {/* ===== EMAIL GATE ===== */}
-      {state.stage === 'email-gate' && (
-        <div class="setup">
-          {state.hasPrototype ? (
-            <div class="section aha-card">
-              <div class="value-pill">MP4 export ready</div>
-              <h3 style="text-align: center;">Found {state.frameCount} prototype frames</h3>
-              <p class="small trust-copy">
-                Enter your email to start your free 720p export. Email tracks monthly usage and Pro status; frame images are sent only when you click Export to create the video.
-              </p>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={state.userEmail}
-                onInput={(e) => setState(prev => ({ ...prev, userEmail: e.currentTarget.value }))}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleEmailSubmit(); }}
-                class="license-input"
-                style="margin-bottom: 12px;"
-              />
-              <button
-                onClick={handleEmailSubmit}
-                disabled={!state.userEmail.trim() || !state.userEmail.includes('@')}
-                class="btn btn-primary btn-large"
-              >
-                Continue to Export
-              </button>
-              <p class="small trust-copy muted">
-                1 free export/month. Resets on the 1st. 720p, watermarked.
-              </p>
-            </div>
-          ) : (
-            <div class="section empty-state">
-              <div class="value-pill warning-pill">No prototype found</div>
-              <h3>Connect your frames first</h3>
-              {samplePreview}
-              <p class="small" style="margin-bottom: 4px;">ProtoVid exports frames linked by prototype interactions. Here's how to set one up:</p>
-              <div class="empty-steps">
-                <div class="empty-step">
-                  <span class="step-num">1</span>
-                  <span>Select two or more frames on this page</span>
-                </div>
-                <div class="empty-step">
-                  <span class="step-num">2</span>
-                  <span>Open the <strong>Prototype</strong> tab in the right panel</span>
-                </div>
-                <div class="empty-step">
-                  <span class="step-num">3</span>
-                  <span>Drag the blue handle from one frame to another to create an interaction</span>
-                </div>
-                <div class="empty-step">
-                  <span class="step-num">4</span>
-                  <span>Click <strong>Scan Prototype</strong> to refresh</span>
-                </div>
-              </div>
-              <button
-                onClick={handleScanPrototype}
-                class="btn btn-primary btn-large"
-                style="margin-top: 4px;"
-              >
-                Scan Prototype
-              </button>
-              <button
-                onClick={handleClosePlugin}
-                class="btn btn-secondary btn-large"
-                style="margin-top: 8px;"
-              >
-                Close Plugin
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       {state.stage === 'scanning' && (
         <div class="loading">
           <div class="spinner"></div>
@@ -452,7 +518,8 @@ function App() {
         <div class="loading">
           <div class="spinner"></div>
           <h3>Confirming payment...</h3>
-          <p class="small" style="margin-top: 8px;">Complete your payment in the browser. We'll detect it automatically.</p>
+          <p class="small" style="margin-top: 8px;">Complete checkout in the browser. The success page confirms Pro, then ProtoVid detects it here automatically.</p>
+          <p class="small" style="margin-top: 8px; color: #6b7280;">If you already paid, use the status check after returning to the plugin.</p>
         </div>
       )}
 
@@ -484,23 +551,41 @@ function App() {
               >
                 Scan Prototype
               </button>
+              <button
+                onClick={handleClosePlugin}
+                class="btn btn-secondary btn-large"
+                style="margin-top: 8px;"
+              >
+                Close Plugin
+              </button>
             </div>
           )}
 
           {state.hasPrototype && (
             <>
+              {emailCaptureCard}
+
               {/* Free tier exhausted banner */}
-              {freeUsed && (
+              {freeUsed && !collectEmail && (
                 <div class="alert alert-upgrade">
-                  <p style="font-weight: 600; margin-bottom: 4px;">Free export used this month</p>
-                  <p class="small">Upgrade for unlimited HD exports, no watermark</p>
-                  <p class="small" style="margin-top: 4px;">Your next free export resets on the 1st of next month.</p>
+                  <p style="font-weight: 600; margin-bottom: 4px;">
+                    {state.trialExpired
+                      ? `Your free trial has expired after ${state.daysSinceFirstExport} days`
+                      : `You've used all ${state.freeLimit} free exports this month`}
+                  </p>
+                  <p class="small">
+                    {state.trialExpired
+                      ? 'Upgrade to keep exporting prototypes.'
+                      : 'Upgrade to keep exporting this prototype today.'}
+                  </p>
+                  <p class="small" style="margin-top: 4px;">Pro includes unlimited MP4 exports, 1080p/4K, and no watermark.</p>
+                  <p class="small" style="margin-top: 4px;">Or come back on the 1st — your free exports reset monthly.</p>
                   <button
                     onClick={handleOpenCheckout}
                     class="btn btn-upgrade btn-small"
                     style="margin-top: 8px;"
                   >
-                    Upgrade — $8/mo
+                    Upgrade — {state.monthlyPriceLabel}
                   </button>
                 </div>
               )}
@@ -510,9 +595,11 @@ function App() {
                 <p>Found <strong>{state.frameCount}</strong> prototype frames</p>
                 {!state.isPremium && (
                   <p class="small" style="margin-top: 4px;">
-                    {remainingExports > 0
-                      ? `${remainingExports}/${state.freeLimit} free export remaining this month - resets on the 1st`
-                      : 'No free exports remaining - resets on the 1st of next month'}
+                    {state.trialExpired
+                      ? `Trial expired after ${state.daysSinceFirstExport} days — upgrade to continue`
+                      : remainingExports > 0
+                        ? `${remainingExports} of ${state.freeLimit} free exports left this month — resets on the 1st`
+                        : 'No free exports left — resets on the 1st of next month'}
                   </p>
                 )}
                 {state.isPremium && (
@@ -551,7 +638,7 @@ function App() {
               </div>
 
               {/* Upgrade section for free users */}
-              {!state.isPremium && !freeUsed && (
+              {!state.isPremium && !freeUsed && !collectEmail && (
                 <div class="section upgrade-section">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
@@ -562,7 +649,7 @@ function App() {
                       onClick={handleOpenCheckout}
                       class="btn btn-upgrade btn-small"
                     >
-                      From $8/mo
+                      {state.monthlyPriceLabel}
                     </button>
                   </div>
                 </div>
@@ -574,8 +661,15 @@ function App() {
               >
                 {canExport
                   ? (state.isPremium ? 'Export HD Video' : 'Export Video (720p, Watermarked)')
-                  : 'Upgrade to Export — from $8/mo'}
+                  : `Upgrade to Export — ${state.monthlyPriceLabel}`}
               </button>
+              {(freeUsed || state.paymentCheckAvailable) && state.userEmail && (
+                <p class="small" style="margin-top: 8px; text-align: center;">
+                  <a href="#" class="link" onClick={(e) => { e.preventDefault(); handleManualPaymentCheck(); }}>
+                    Already paid? Check payment status
+                  </a>
+                </p>
+              )}
             </>
           )}
         </div>
@@ -632,13 +726,15 @@ function App() {
             <div class="upgrade-card">
               <h3 style="margin-bottom: 8px;">Remove watermark + unlock HD</h3>
               <p class="small" style="margin-bottom: 4px;">Your export has a "Made with love by ProtoVid" watermark.</p>
-              <p class="small" style="margin-bottom: 12px;">Premium removes it and unlocks 1080p/4K + unlimited exports.</p>
-              <button
-                onClick={handleOpenCheckout}
-                class="btn btn-upgrade"
-              >
-                Upgrade to Pro — $8/mo
-              </button>
+              <p class="small" style="margin-bottom: 12px;">Premium removes it and unlocks 1080p/4K + unlimited exports — from $29/year.</p>
+              {collectEmail ? emailCaptureCard : (
+                <button
+                  onClick={handleOpenCheckout}
+                  class="btn btn-upgrade"
+                >
+                  Upgrade to Pro — {state.monthlyPriceLabel}
+                </button>
+              )}
             </div>
           )}
 

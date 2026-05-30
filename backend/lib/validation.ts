@@ -43,6 +43,7 @@ export const eventTypeSchema = z.enum([
   'export_failed',
   'prototype_detected',
   'paywall_viewed',
+  'pricing_variant_assigned',
   'review_prompt_shown',
   'review_prompt_clicked',
   'checkout_start',
@@ -121,6 +122,13 @@ export const licenseValidationRequestSchema = z.object({
 export const checkoutRequestSchema = z.object({
   email: emailSchema,
   plan: z.enum(['monthly', 'yearly']).optional()
+});
+
+export const checkoutSessionConfirmationSchema = z.object({
+  sessionId: z.string()
+    .min(1, 'Checkout session is required')
+    .max(255, 'Checkout session is too long')
+    .regex(/^cs_(test|live)_[A-Za-z0-9_]+$/, 'Invalid checkout session')
 });
 
 export const exportCheckRequestSchema = z.object({

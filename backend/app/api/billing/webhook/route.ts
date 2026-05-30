@@ -68,12 +68,18 @@ export async function POST(request: NextRequest) {
           event: 'checkout.session.completed',
           stripe_session_id: session.id,
           stripe_subscription_id: session.subscription as string | null,
+          pricing_variant: session.metadata?.pricing_variant || null,
+          price_label: session.metadata?.price_label || null,
+          amount_cents: session.metadata?.amount_cents || null,
         });
         await recordEvent(email, 'payment_confirmed', {
           source: 'stripe_webhook',
           event: 'checkout.session.completed',
           stripe_session_id: session.id,
           stripe_subscription_id: session.subscription as string | null,
+          pricing_variant: session.metadata?.pricing_variant || null,
+          price_label: session.metadata?.price_label || null,
+          amount_cents: session.metadata?.amount_cents || null,
         });
         break;
       }
