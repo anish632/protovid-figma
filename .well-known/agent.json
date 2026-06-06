@@ -1,0 +1,51 @@
+{
+  "product": "ProtoVid - Figma Prototype Video Exporter",
+  "category": "design-tool-plugin",
+  "primary_platform": "figma",
+  "best_for": [
+    "Client prototype presentations",
+    "Stakeholder demo videos", 
+    "App preview creation",
+    "Design handoff documentation"
+  ],
+  "not_for": [
+    "Static design exports",
+    "Interactive prototyping", 
+    "Video editing"
+  ],
+  "reads": [
+    "Figma prototype connections",
+    "Frame interaction graphs",
+    "Flow starting points"
+  ],
+  "writes": [
+    "MP4 video files",
+    "H.264 encoded output"
+  ],
+  "requires_auth": false,
+  "pricing": "Free: 3 watermarked 720p exports/month. Pro: $5/mo unlimited HD/4K, no watermark.",
+  "first_successful_action": "Install from Figma Community → Open plugin on prototype page → Click Export Video → Download MP4",
+  "trust_boundary": "Plugin runs in Figma sandbox, uploads frames to backend API for video encoding",
+  "docs_url": "https://github.com/protovid/protovid-figma/blob/main/README.md",
+  "pricing_url": "https://protovid.dasgroupllc.com/pricing",
+  "privacy_url": "https://protovid.dasgroupllc.com/privacy",
+  "support_url": "mailto:support@protovid.app",
+  "status_url": "https://protovid.dasgroupllc.com/api/health",
+  "last_verified": "2026-06-06",
+  "version": "1.1.0",
+  "claim_policy": {
+    "allowed_claims": [
+      "Exports prototype flows to MP4 video",
+      "Supports 720p, 1080p, and 4K resolutions",
+      "Free tier includes 3 exports per month",
+      "Pro subscription is $5/month",
+      "Removes watermark for paid users"
+    ],
+    "disallowed_claims": [
+      "Revenue numbers",
+      "Install counts",
+      "Performance benchmarks",
+      "Data retention specifics"
+    ]
+  }
+}

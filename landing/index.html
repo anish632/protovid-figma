@@ -3,8 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProtoVid - Turn Figma Prototype Flows into Shareable Videos</title>
-  <meta name="description" content="ProtoVid records your connected Figma prototype flow — every screen, in order — and exports a clean MP4. Not a folder of static frames. Pro unlocks up to 4K, no watermark, and unlimited exports for $8/month or $29/year.">
+  <title>ProtoVid - Client-Ready Figma Prototype Demo Videos</title>
+  <meta name="description" content="ProtoVid records your connected Figma prototype flow — every screen, in order — and exports a client-ready MP4 for reviews, decks, app previews, and handoff. Pro unlocks up to 4K, no watermark, and unlimited exports.">
+  <meta name="keywords" content="figma plugin, prototype videos, client demos, figma export, mp4 export, design tools, prototype automation">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="ProtoVid - Client-Ready Figma Prototype Demo Videos">
+  <meta property="og:description" content="Turn connected Figma prototypes into client-ready MP4 videos. No screen recording needed - captures the real flow automatically.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="../protovid-slide1.png">
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ProtoVid",
+    "description": "Figma plugin that converts prototype flows into client-ready MP4 demo videos",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "Free",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "3 watermarked 720p exports per month"
+      },
+      {
+        "@type": "Offer", 
+        "name": "Pro",
+        "price": "5",
+        "priceCurrency": "USD",
+        "billingIncrement": "Month",
+        "description": "Unlimited HD/4K exports, no watermark"
+      }
+    ],
+    "featureList": [
+      "Prototype flow detection",
+      "MP4 video export", 
+      "720p, 1080p, 4K resolution",
+      "Watermark removal (Pro)",
+      "Client-ready output"
+    ]
+  }
+  </script>
+  
   <link rel="icon" type="image/png" href="../logo128x128.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -646,7 +690,7 @@
       <div class="nav-links">
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
-        <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">Get Premium</a>
+        <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">Get Pro</a>
       </div>
     </div>
   </nav>
@@ -655,8 +699,8 @@
   <section class="hero">
     <div class="container">
       <div class="hero-badge">Figma Plugin <span>&mdash; Free to start</span></div>
-      <h1>Prototype Flows.<br><em>Ready to Share.</em></h1>
-      <p class="subtitle">ProtoVid walks through your connected Figma prototype &mdash; every screen, in order &mdash; and exports a clean MP4. Not a folder of static frames: the actual flow, ready for reviews, decks, and stakeholder walkthroughs.</p>
+      <h1>Client-Ready Prototype Videos.<br><em>From Figma.</em></h1>
+      <p class="subtitle">ProtoVid walks through your connected Figma prototype &mdash; every screen, in order &mdash; and exports a clean MP4 for client reviews, pitch decks, app previews, and stakeholder walkthroughs. Not a folder of static frames: the actual flow, ready to send.</p>
       <div class="hero-buttons">
         <a href="#install" class="btn btn-primary btn-large">Install Plugin &mdash; Free</a>
         <a href="#features" class="btn btn-secondary btn-large">See Features</a>
@@ -681,11 +725,11 @@
         </div>
         <div class="stat">
           <span class="number">HD</span>
-          <span class="label">Pro video quality</span>
+          <span class="label">Client-ready quality</span>
         </div>
         <div class="stat">
-          <span class="number">$29<span style="font-size:15px;font-weight:500;color:var(--text-muted)">/yr</span></span>
-          <span class="label">Pro &mdash; unlimited 4K exports</span>
+          <span class="number">$5<span style="font-size:15px;font-weight:500;color:var(--text-muted)">/mo</span></span>
+          <span class="label">Pro &mdash; no watermark, unlimited exports</span>
         </div>
       </div>
     </div>
@@ -696,7 +740,7 @@
     <div class="container">
       <div class="section-header">
         <span class="section-label">Features</span>
-        <h2 class="section-title">Everything you need to share prototypes</h2>
+        <h2 class="section-title">Everything you need to send prototype demos</h2>
         <p class="section-subtitle">No screen recording, no complicated setup. ProtoVid works directly inside Figma.</p>
       </div>
       <div class="feature-grid">
@@ -778,8 +822,8 @@
     <div class="container">
       <div class="section-header">
         <span class="section-label">Pricing</span>
-        <h2 class="section-title">Simple pricing. Start free.</h2>
-        <p class="section-subtitle">ProtoVid Pro is $8/month &mdash; or $29 for the whole year. No credit card required to start.</p>
+        <h2 class="section-title">Start with free proof exports.</h2>
+        <p class="section-subtitle">Export 3 watermarked 720p MP4s per month for free. Upgrade when you need client-ready HD/4K, no watermark, and repeat exports.</p>
       </div>
       <div class="pricing-grid">
         <div class="pricing-card">
@@ -789,7 +833,7 @@
             <span class="period">/month</span>
           </div>
           <ul class="plan-features">
-            <li><span class="check">&#x2713;</span> 1 export per month</li>
+            <li><span class="check">&#x2713;</span> 3 exports per month</li>
             <li><span class="check">&#x2713;</span> 720p resolution</li>
             <li><span class="check">&#x2713;</span> MP4 output</li>
             <li><span class="check">&#x2713;</span> Auto flow detection</li>
@@ -801,16 +845,16 @@
         <div class="pricing-card featured">
           <div class="plan-name">Pro</div>
           <div class="plan-price">
-            <span class="amount">$8</span>
+            <span class="amount">$5</span>
             <span class="period">/month</span>
           </div>
           <ul class="plan-features">
-            <li><span class="check">&#x2713;</span> Unlimited exports</li>
+            <li><span class="check">&#x2713;</span> Unlimited client-ready exports</li>
             <li><span class="check">&#x2713;</span> Up to 4K resolution</li>
             <li><span class="check">&#x2713;</span> HD/4K MP4 output</li>
             <li><span class="check">&#x2713;</span> Auto flow detection</li>
-            <li><span class="check">&#x2713;</span> No watermark</li>
-            <li><span class="check">&#x2713;</span> Annual plan available</li>
+            <li><span class="check">&#x2713;</span> No watermark for client delivery</li>
+            <li><span class="check">&#x2713;</span> $5/month subscription</li>
           </ul>
           <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">Upgrade Now</a>
         </div>
