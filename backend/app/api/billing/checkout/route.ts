@@ -11,8 +11,8 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, plan } = checkoutRequestSchema.parse(body);
-    const selectedPlan = plan || 'monthly';
+    const { email } = checkoutRequestSchema.parse(body);
+    const selectedPlan = 'monthly';
     const pricing = getPricingVariantWithPriceId(email, selectedPlan);
 
     await recordEvent(email, 'pricing_variant_assigned', {

@@ -5,8 +5,13 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
 
 export const FREE_TIER_EXPORT_LIMIT = parsePositiveInteger(
   process.env.PROTOVID_FREE_EXPORT_LIMIT,
-  1
+  3
 );
+
+export const PRO_PRICE_MONTHLY_DISPLAY = '$5/mo';
+export const PRO_PRICE_MONTHLY_CENTS = 500;
+export const FREE_RESOLUTION = '720p';
+export const PRO_RESOLUTIONS = ['1080p', '4K'] as const;
 
 export const PRO_TIER_EXPORT_LIMIT = 999;
 

@@ -17,6 +17,8 @@ export async function createCheckoutSession(params: {
 }) {
   const stripe = getStripe();
   
+  // TODO: Verify the Stripe Dashboard product/price copy says
+  // "Subscribe to ProtoVid Pro" and "Unlimited exports with 1080p/4K support".
   const session = await stripe.checkout.sessions.create({
     customer_email: params.customerEmail,
     line_items: [

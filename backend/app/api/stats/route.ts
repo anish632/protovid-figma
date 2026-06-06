@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         event_type,
         COUNT(*) as count,
-        COUNT(DISTINCT email) as users,
+        COUNT(DISTINCT COALESCE(email, NULLIF(metadata::jsonb->>'anonymousId', ''))) as users,
         COUNT(*) FILTER (WHERE email IS NULL) as anonymous_count
       FROM protovid_events
       WHERE created_at >= ${last30d}
@@ -56,12 +56,12 @@ export async function GET(request: NextRequest) {
       ORDER BY date DESC
     `;
 
-    // Active users (unique emails, last 30 days)
+    // Active users (unique known emails or anonymous plugin ids, last 30 days)
     const [activeUsers] = await sql`
-      SELECT COUNT(DISTINCT email) as count
+      SELECT COUNT(DISTINCT COALESCE(email, NULLIF(metadata::jsonb->>'anonymousId', ''))) as count
       FROM protovid_events
       WHERE created_at >= ${last30d}
-      AND email IS NOT NULL
+      AND COALESCE(email, NULLIF(metadata::jsonb->>'anonymousId', '')) IS NOT NULL
     `;
 
     // Total subscriptions
@@ -78,24 +78,42 @@ export async function GET(request: NextRequest) {
 
     // Funnel summary (last 30 days)
     const [funnelSummary] = await sql`
+      WITH recent AS (
+        SELECT
+          event_type,
+          COALESCE(email, NULLIF(metadata::jsonb->>'anonymousId', '')) as actor_id
+        FROM protovid_events
+        WHERE created_at >= ${last30d}
+      )
       SELECT
         COUNT(*) FILTER (WHERE event_type = 'first_open') as first_open_events,
-        COUNT(*) FILTER (WHERE event_type = 'onboarding_started') as onboarding_started_events,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'onboarding_completed') as onboarding_completed_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'email_captured') as email_captured_users,
-        COUNT(*) FILTER (WHERE event_type = 'first_action_completed') as first_action_completed_events,
-        COUNT(*) FILTER (WHERE event_type = 'demo_state_shown') as demo_state_shown_events,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'first_value_reached') as first_value_reached_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'export') as export_attempt_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'export_completed') as export_completed_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'review_prompt_shown') as review_prompt_shown_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'review_prompt_clicked') as review_prompt_clicked_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'pricing_variant_assigned') as pricing_variant_assigned_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_start') as checkout_start_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_opened') as checkout_opened_users,
-        COUNT(DISTINCT email) FILTER (WHERE event_type = 'payment_confirmed') as payment_confirmed_users
-      FROM protovid_events
-      WHERE created_at >= ${last30d}
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'first_open') as first_open_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'onboarding_started') as onboarding_started_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'onboarding_completed') as onboarding_completed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'email_captured') as email_captured_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'first_action_completed') as first_action_completed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'demo_state_shown') as demo_state_shown_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'prototype_detected') as prototype_detected_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'export_setup_viewed') as export_setup_viewed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'export_settings_changed') as export_settings_changed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'format_interest') as format_interest_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'first_value_reached') as first_value_reached_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'export') as export_attempt_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'export_completed') as export_completed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'download_clicked') as download_clicked_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'review_prompt_shown') as review_prompt_shown_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'review_prompt_clicked') as review_prompt_clicked_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'paywall_viewed') as paywall_viewed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_email_prompt_shown') as checkout_email_prompt_shown_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'pricing_variant_assigned') as pricing_variant_assigned_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_start') as checkout_start_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_opened') as checkout_opened_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_completed') as checkout_completed_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'payment_poll_started') as payment_poll_started_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'payment_poll_timeout') as payment_poll_timeout_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'payment_status_checked') as payment_status_checked_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'payment_confirmed') as payment_confirmed_users
+      FROM recent
     `;
 
     // Pricing experiment summary (last 30 days)
@@ -105,12 +123,13 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'pricing_variant_assigned') as assigned_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'paywall_viewed') as paywall_viewed_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_opened') as checkout_opened_users,
+        COUNT(DISTINCT email) FILTER (WHERE event_type = 'checkout_completed') as checkout_completed_users,
         COUNT(DISTINCT email) FILTER (WHERE event_type = 'payment_confirmed') as payment_confirmed_users,
         COALESCE(MAX((metadata::jsonb->>'amountCents')::integer), MAX((metadata::jsonb->>'amount_cents')::integer), 0) as amount_cents,
         COALESCE(MAX(metadata::jsonb->>'priceLabel'), MAX(metadata::jsonb->>'price_label'), '') as price_label
       FROM protovid_events
       WHERE created_at >= ${last30d}
-        AND event_type IN ('pricing_variant_assigned', 'paywall_viewed', 'checkout_opened', 'payment_confirmed')
+        AND event_type IN ('pricing_variant_assigned', 'paywall_viewed', 'checkout_opened', 'checkout_completed', 'payment_confirmed')
       GROUP BY pricing_variant
       ORDER BY pricing_variant ASC
     `;
@@ -137,6 +156,7 @@ export async function GET(request: NextRequest) {
     const recentEvents = await sql`
       SELECT 
         email,
+        NULLIF(metadata::jsonb->>'anonymousId', '') as anonymous_id,
         event_type,
         plugin_version,
         metadata,
@@ -163,19 +183,31 @@ export async function GET(request: NextRequest) {
       proSubscriptions: parseInt(proSubs.count),
       funnel30d: {
         firstOpenEvents: parseInt(funnelSummary.first_open_events || '0'),
-        onboardingStartedEvents: parseInt(funnelSummary.onboarding_started_events || '0'),
+        firstOpenUsers: parseInt(funnelSummary.first_open_users || '0'),
+        onboardingStartedUsers: parseInt(funnelSummary.onboarding_started_users || '0'),
         onboardingCompletedUsers: parseInt(funnelSummary.onboarding_completed_users || '0'),
         emailCapturedUsers: parseInt(funnelSummary.email_captured_users || '0'),
-        firstActionCompletedEvents: parseInt(funnelSummary.first_action_completed_events || '0'),
-        demoStateShownEvents: parseInt(funnelSummary.demo_state_shown_events || '0'),
+        firstActionCompletedUsers: parseInt(funnelSummary.first_action_completed_users || '0'),
+        demoStateShownUsers: parseInt(funnelSummary.demo_state_shown_users || '0'),
+        prototypeDetectedUsers: parseInt(funnelSummary.prototype_detected_users || '0'),
+        exportSetupViewedUsers: parseInt(funnelSummary.export_setup_viewed_users || '0'),
+        exportSettingsChangedUsers: parseInt(funnelSummary.export_settings_changed_users || '0'),
+        formatInterestUsers: parseInt(funnelSummary.format_interest_users || '0'),
         firstValueReachedUsers: parseInt(funnelSummary.first_value_reached_users || '0'),
         exportAttemptUsers: parseInt(funnelSummary.export_attempt_users || '0'),
         exportCompletedUsers: parseInt(funnelSummary.export_completed_users || '0'),
+        downloadClickedUsers: parseInt(funnelSummary.download_clicked_users || '0'),
         reviewPromptShownUsers: parseInt(funnelSummary.review_prompt_shown_users || '0'),
         reviewPromptClickedUsers: parseInt(funnelSummary.review_prompt_clicked_users || '0'),
+        paywallViewedUsers: parseInt(funnelSummary.paywall_viewed_users || '0'),
+        checkoutEmailPromptShownUsers: parseInt(funnelSummary.checkout_email_prompt_shown_users || '0'),
         pricingVariantAssignedUsers: parseInt(funnelSummary.pricing_variant_assigned_users || '0'),
         checkoutStartUsers: parseInt(funnelSummary.checkout_start_users || '0'),
         checkoutOpenedUsers: parseInt(funnelSummary.checkout_opened_users || '0'),
+        checkoutCompletedUsers: parseInt(funnelSummary.checkout_completed_users || '0'),
+        paymentPollStartedUsers: parseInt(funnelSummary.payment_poll_started_users || '0'),
+        paymentPollTimeoutUsers: parseInt(funnelSummary.payment_poll_timeout_users || '0'),
+        paymentStatusCheckedUsers: parseInt(funnelSummary.payment_status_checked_users || '0'),
         paymentConfirmedUsers: parseInt(funnelSummary.payment_confirmed_users || '0'),
       },
       pricingExperiment30d: pricingExperiment.map((row: any) => ({
@@ -185,6 +217,7 @@ export async function GET(request: NextRequest) {
         assignedUsers: parseInt(row.assigned_users || '0'),
         paywallViewedUsers: parseInt(row.paywall_viewed_users || '0'),
         checkoutOpenedUsers: parseInt(row.checkout_opened_users || '0'),
+        checkoutCompletedUsers: parseInt(row.checkout_completed_users || '0'),
         paymentConfirmedUsers: parseInt(row.payment_confirmed_users || '0'),
       })),
       freeTier30d: {
@@ -195,6 +228,7 @@ export async function GET(request: NextRequest) {
       },
       recentEvents: recentEvents.map((e: any) => ({
         email: e.email,
+        anonymousId: e.anonymous_id,
         eventType: e.event_type,
         pluginVersion: e.plugin_version,
         metadata: e.metadata,

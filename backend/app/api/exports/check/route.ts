@@ -1,71 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pluginCorsHeaders } from '@/lib/cors';
+import { buildEntitlementResponse, getBillingPeriodKey } from '@/lib/entitlement';
 import { getSubscription, setSubscription } from '@/lib/storage';
-import { FREE_TIER_EXPORT_LIMIT, PRO_TIER_EXPORT_LIMIT, isPremiumSubscription } from '@/lib/plans';
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 import { withRateLimit, generalRateLimit } from '@/lib/rateLimit';
 
-const FREE_TRIAL_DAYS = 7;
-
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
+  return NextResponse.json({}, { status: 200, headers: pluginCorsHeaders });
 }
 
 async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = exportCheckRequestSchema.parse(body);
-    const subscription = await getSubscription(email);
-    const isPremium = isPremiumSubscription(subscription);
-
-    if (isPremium) {
-      return NextResponse.json(
-        { canExport: true, exportsThisMonth: 0, limit: PRO_TIER_EXPORT_LIMIT, isPremium: true }
-      );
-    }
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const { email, userId } = exportCheckRequestSchema.parse(body);
+    const exportUserId = email || userId!;
+    const subscription = await getSubscription(exportUserId);
+    const currentMonth = getBillingPeriodKey();
     const exportsThisMonth = subscription.lastResetMonth === currentMonth ? subscription.exportsThisMonth : 0;
-    
-    // Check if trial period has expired (7 days from first export)
-    let trialExpired = false;
-    if (subscription.firstExportDate) {
-      const firstExportDate = new Date(subscription.firstExportDate);
-      const today = new Date();
-      const daysSinceFirstExport = Math.floor((today.getTime() - firstExportDate.getTime()) / (1000 * 60 * 60 * 24));
-      trialExpired = daysSinceFirstExport >= FREE_TRIAL_DAYS;
-    }
 
     if (subscription.lastResetMonth !== currentMonth) {
-      await setSubscription(email, {
+      await setSubscription(exportUserId, {
         exportsThisMonth,
         lastResetMonth: currentMonth,
       });
+      subscription.exportsThisMonth = exportsThisMonth;
+      subscription.lastResetMonth = currentMonth;
     }
 
-    // Can export if: under export limit AND trial not expired
-    const canExport = exportsThisMonth < FREE_TIER_EXPORT_LIMIT && !trialExpired;
+    const entitlement = buildEntitlementResponse(exportUserId, subscription);
 
-    return NextResponse.json({
-      canExport,
-      exportsThisMonth,
-      limit: FREE_TIER_EXPORT_LIMIT,
-      isPremium: false,
-      trialExpired,
-      daysSinceFirstExport: subscription.firstExportDate 
-        ? Math.floor((new Date().getTime() - new Date(subscription.firstExportDate).getTime()) / (1000 * 60 * 60 * 24))
-        : null,
-    });
+    return NextResponse.json(
+      {
+        ...entitlement,
+        exportsThisMonth: entitlement.freeExportsUsed,
+        limit: entitlement.freeExportsLimit,
+        isPremium: entitlement.isPaid,
+        trialExpired: false,
+        daysSinceFirstExport: subscription.firstExportDate
+          ? Math.floor((new Date().getTime() - new Date(subscription.firstExportDate).getTime()) / (1000 * 60 * 60 * 24))
+          : null,
+      },
+      { headers: pluginCorsHeaders }
+    );
   } catch (error) {
     console.error('Export check error:', error);
     return NextResponse.json(
       {
         canExport: false,
-        exportsThisMonth: FREE_TIER_EXPORT_LIMIT,
-        limit: FREE_TIER_EXPORT_LIMIT,
-        isPremium: false,
-        trialExpired: true,
         error: sanitizeError(error)
       },
-      { status: 500 }
+      { status: 500, headers: pluginCorsHeaders }
     );
   }
 }

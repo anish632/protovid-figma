@@ -1,55 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FREE_TIER_EXPORT_LIMIT, PRO_TIER_EXPORT_LIMIT, isPremiumSubscription } from '@/lib/plans';
+import { buildEntitlementResponse } from '@/lib/entitlement';
+import { FREE_TIER_EXPORT_LIMIT, isPremiumSubscription } from '@/lib/plans';
 import { getSubscription, incrementExportCount } from '@/lib/storage';
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { pluginCorsHeaders } from '@/lib/cors';
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+  return NextResponse.json({}, { status: 200, headers: pluginCorsHeaders });
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = exportCheckRequestSchema.parse(body);
-    const existing = await getSubscription(email);
+    const { email, userId } = exportCheckRequestSchema.parse(body);
+    const exportUserId = email || userId!;
+    const existing = await getSubscription(exportUserId);
     const isPremium = isPremiumSubscription(existing);
     const currentMonth = new Date().toISOString().slice(0, 7);
     const exportsThisMonth = existing.lastResetMonth === currentMonth ? existing.exportsThisMonth : 0;
 
+    if (isPremium) {
+      const entitlement = buildEntitlementResponse(exportUserId, existing);
+      return NextResponse.json(
+        {
+          success: true,
+          ...entitlement,
+          exportsThisMonth: entitlement.freeExportsUsed,
+          limit: entitlement.freeExportsLimit,
+        },
+        { headers: pluginCorsHeaders }
+      );
+    }
+
     if (!isPremium && exportsThisMonth >= FREE_TIER_EXPORT_LIMIT) {
+      const entitlement = buildEntitlementResponse(exportUserId, {
+        ...existing,
+        exportsThisMonth,
+        lastResetMonth: currentMonth,
+      });
       return NextResponse.json(
         {
           success: false,
+          ...entitlement,
           exportsThisMonth,
           limit: FREE_TIER_EXPORT_LIMIT,
           error: 'Free export limit reached',
         },
-        { status: 403, headers: corsHeaders }
+        { status: 403, headers: pluginCorsHeaders }
       );
     }
 
-    const subscription = await incrementExportCount(email);
+    const subscription = await incrementExportCount(exportUserId);
+    const entitlement = buildEntitlementResponse(exportUserId, subscription);
 
     return NextResponse.json(
       {
         success: true,
-        exportsThisMonth: subscription.exportsThisMonth,
-        limit: isPremiumSubscription(subscription) ? PRO_TIER_EXPORT_LIMIT : FREE_TIER_EXPORT_LIMIT,
+        ...entitlement,
+        exportsThisMonth: entitlement.freeExportsUsed,
+        limit: entitlement.freeExportsLimit,
       },
-      { headers: corsHeaders }
+      { headers: pluginCorsHeaders }
     );
   } catch (error) {
     console.error('Export increment error:', error);
     const status = error instanceof Error && error.name === 'ZodError' ? 400 : 500;
     return NextResponse.json(
       { success: false, error: sanitizeError(error) },
-      { status, headers: corsHeaders }
+      { status, headers: pluginCorsHeaders }
     );
   }
 }

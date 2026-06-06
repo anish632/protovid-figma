@@ -28,6 +28,7 @@ export const apiKeySchema = z.string()
 // Event type validation
 export const eventTypeSchema = z.enum([
   'plugin_load',
+  'plugin_opened',
   'first_open',
   'onboarding_started',
   'onboarding_completed',
@@ -35,20 +36,34 @@ export const eventTypeSchema = z.enum([
   'first_value_reached',
   'demo_state_shown',
   'email_captured',
+  'export_setup_viewed',
+  'export_settings_changed',
+  'format_interest',
+  'download_clicked',
+  'checkout_email_prompt_shown',
+  'payment_poll_started',
+  'payment_poll_timeout',
+  'payment_status_checked',
   'export',
+  'export_clicked',
   'export_started',
   'export_completed',
+  'export_succeeded',
   'export_success',
   'export_blocked',
   'export_failed',
   'prototype_detected',
+  'prototype_frames_detected',
   'paywall_viewed',
   'pricing_variant_assigned',
   'review_prompt_shown',
   'review_prompt_clicked',
   'checkout_start',
+  'checkout_started',
   'checkout_opened',
+  'checkout_completed',
   'checkout_error',
+  'upgrade_clicked',
   'subscription_started',
   'license_validate',
   'license_validation',
@@ -131,8 +146,17 @@ export const checkoutSessionConfirmationSchema = z.object({
     .regex(/^cs_(test|live)_[A-Za-z0-9_]+$/, 'Invalid checkout session')
 });
 
+export const exportUserIdSchema = z.string()
+  .min(3, 'User id is required')
+  .max(254, 'User id is too long')
+  .regex(/^[a-zA-Z0-9@._:-]+$/, 'Invalid user id format')
+  .transform(userId => userId.toLowerCase().trim());
+
 export const exportCheckRequestSchema = z.object({
-  email: emailSchema
+  email: emailSchema.optional(),
+  userId: exportUserIdSchema.optional()
+}).refine(data => data.email || data.userId, {
+  message: 'Email or user id is required',
 });
 
 // Rate limiting configuration

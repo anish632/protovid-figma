@@ -33,7 +33,7 @@
 - ✅ Test script (lib/test-db.ts) passes all checks
 
 ### 6. UI Verification ✅
-- ✅ "Get Premium ($8/mo)" button exists in src/ui.tsx
+- ✅ "Upgrade to Pro — $5/mo" button exists in src/ui.tsx
 - ✅ Triggers `handleOpenCheckout()` in code.ts
 - ✅ Opens Stripe checkout via `figma.openExternal()`
 - ✅ User flow: email → pay → return → validate

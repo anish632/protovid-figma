@@ -1,40 +1,24 @@
+import { PRO_PRICE_MONTHLY_CENTS, PRO_PRICE_MONTHLY_DISPLAY } from './plans';
+
 export type BillingPlan = 'monthly' | 'yearly';
-export type PricingVariantId = 'monthly_5' | 'monthly_8' | 'yearly_29';
+export type PricingVariantId = 'monthly_5';
 
 export interface PricingVariant {
   id: PricingVariantId;
-  plan: BillingPlan;
+  plan: 'monthly';
   label: string;
   amountCents: number;
   currency: 'usd';
-  priceEnvVar: 'PROTOVID_MONTHLY_5_PRICE_ID' | 'PROTOVID_PRICE_ID' | 'PROTOVID_YEARLY_PRICE_ID';
+  priceEnvVars: readonly ['PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'];
 }
 
 export const MONTHLY_PRICE_5: PricingVariant = {
   id: 'monthly_5',
   plan: 'monthly',
-  label: '$5/mo',
-  amountCents: 500,
+  label: PRO_PRICE_MONTHLY_DISPLAY,
+  amountCents: PRO_PRICE_MONTHLY_CENTS,
   currency: 'usd',
-  priceEnvVar: 'PROTOVID_MONTHLY_5_PRICE_ID',
-};
-
-export const MONTHLY_PRICE_8: PricingVariant = {
-  id: 'monthly_8',
-  plan: 'monthly',
-  label: '$8/mo',
-  amountCents: 800,
-  currency: 'usd',
-  priceEnvVar: 'PROTOVID_PRICE_ID',
-};
-
-export const YEARLY_PRICE_29: PricingVariant = {
-  id: 'yearly_29',
-  plan: 'yearly',
-  label: '$29/yr',
-  amountCents: 2900,
-  currency: 'usd',
-  priceEnvVar: 'PROTOVID_YEARLY_PRICE_ID',
+  priceEnvVars: ['PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'],
 };
 
 function normalizeEmail(email: string): string {
@@ -54,11 +38,13 @@ export function stableEmailHash(email: string): number {
 }
 
 export function getMonthlyPricingVariant(email: string): PricingVariant {
-  return stableEmailHash(email) % 2 === 0 ? MONTHLY_PRICE_5 : MONTHLY_PRICE_8;
+  normalizeEmail(email);
+  return MONTHLY_PRICE_5;
 }
 
 export function getPricingVariant(email: string, plan: BillingPlan = 'monthly'): PricingVariant {
-  if (plan === 'yearly') return YEARLY_PRICE_29;
+  normalizeEmail(email);
+  void plan;
   return getMonthlyPricingVariant(email);
 }
 
@@ -67,13 +53,8 @@ export function getPricingVariantForEnvironment(
   plan: BillingPlan = 'monthly',
   env: NodeJS.ProcessEnv = process.env
 ): PricingVariant {
-  const assigned = getPricingVariant(email, plan);
-
-  if (assigned.id === 'monthly_5' && !env.PROTOVID_MONTHLY_5_PRICE_ID?.trim()) {
-    return MONTHLY_PRICE_8;
-  }
-
-  return assigned;
+  void env;
+  return getPricingVariant(email, plan);
 }
 
 export function getPricingVariantWithPriceId(
@@ -82,10 +63,12 @@ export function getPricingVariantWithPriceId(
   env: NodeJS.ProcessEnv = process.env
 ): PricingVariant & { priceId: string } {
   const variant = getPricingVariantForEnvironment(email, plan, env);
-  const priceId = env[variant.priceEnvVar]?.trim();
+  const priceId = variant.priceEnvVars
+    .map(envVar => env[envVar]?.trim())
+    .find(Boolean);
 
   if (!priceId) {
-    throw new Error(`${variant.id} billing not configured`);
+    throw new Error(`${variant.id} billing not configured. Set PROTOVID_MONTHLY_5_PRICE_ID to the Stripe $5/mo price ID.`);
   }
 
   return {

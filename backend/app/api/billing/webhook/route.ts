@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { verifyWebhook } from '@/lib/stripe';
 import { setSubscription, findSubscriptionByCustomerId, findSubscriptionBySubscriptionId } from '@/lib/storage';
+import { getCheckoutEmail, getCheckoutEventMetadata, getCheckoutSubscriptionUpdate } from '@/lib/checkoutConfirmation';
 import Stripe from 'stripe';
 
 function getDB() {
@@ -50,37 +51,18 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const email = session.customer_email || session.metadata?.email;
+        const email = getCheckoutEmail(session);
 
         if (!email) {
           console.error('No email in checkout session');
           break;
         }
 
-        await setSubscription(email, {
-          tier: 'pro',
-          status: 'active',
-          stripeCustomerId: session.customer as string,
-          stripeSubscriptionId: session.subscription as string,
-        });
-        await recordEvent(email, 'subscription_started', {
-          source: 'stripe_webhook',
-          event: 'checkout.session.completed',
-          stripe_session_id: session.id,
-          stripe_subscription_id: session.subscription as string | null,
-          pricing_variant: session.metadata?.pricing_variant || null,
-          price_label: session.metadata?.price_label || null,
-          amount_cents: session.metadata?.amount_cents || null,
-        });
-        await recordEvent(email, 'payment_confirmed', {
-          source: 'stripe_webhook',
-          event: 'checkout.session.completed',
-          stripe_session_id: session.id,
-          stripe_subscription_id: session.subscription as string | null,
-          pricing_variant: session.metadata?.pricing_variant || null,
-          price_label: session.metadata?.price_label || null,
-          amount_cents: session.metadata?.amount_cents || null,
-        });
+        await setSubscription(email, getCheckoutSubscriptionUpdate(session));
+        const eventMetadata = getCheckoutEventMetadata(session, 'stripe_webhook', 'checkout.session.completed');
+        await recordEvent(email, 'subscription_started', eventMetadata);
+        await recordEvent(email, 'checkout_completed', eventMetadata);
+        await recordEvent(email, 'payment_confirmed', eventMetadata);
         break;
       }
 

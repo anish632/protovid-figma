@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { retrieveCheckoutSession } from '@/lib/stripe';
 import { setSubscription } from '@/lib/storage';
 import { checkoutSessionConfirmationSchema, sanitizeError } from '@/lib/validation';
+import { getCheckoutEmail, getCheckoutEventMetadata, getCheckoutSubscriptionUpdate } from '@/lib/checkoutConfirmation';
 
 function getDB() {
   if (!process.env.NEON_DATABASE_URL) {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const email = session.customer_details?.email || session.customer_email || session.metadata?.email;
+    const email = getCheckoutEmail(session);
     if (!email) {
       return NextResponse.json(
         { confirmed: false, error: 'Checkout session has no email' },
@@ -51,29 +52,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await setSubscription(email, {
-      tier: 'pro',
-      status: 'active',
-      stripeCustomerId: typeof session.customer === 'string' ? session.customer : undefined,
-      stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : undefined,
-    });
+    await setSubscription(email, getCheckoutSubscriptionUpdate(session));
 
-    await recordEvent(email, 'subscription_started', {
-      source: 'stripe_success_redirect',
-      stripe_session_id: session.id,
-      stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : null,
-      pricing_variant: session.metadata?.pricing_variant || null,
-      price_label: session.metadata?.price_label || null,
-      amount_cents: session.metadata?.amount_cents || null,
-    });
-    await recordEvent(email, 'payment_confirmed', {
-      source: 'stripe_success_redirect',
-      stripe_session_id: session.id,
-      stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : null,
-      pricing_variant: session.metadata?.pricing_variant || null,
-      price_label: session.metadata?.price_label || null,
-      amount_cents: session.metadata?.amount_cents || null,
-    });
+    const eventMetadata = getCheckoutEventMetadata(session, 'stripe_success_redirect');
+    await recordEvent(email, 'subscription_started', eventMetadata);
+    await recordEvent(email, 'checkout_completed', eventMetadata);
+    await recordEvent(email, 'payment_confirmed', eventMetadata);
 
     return NextResponse.json({ confirmed: true });
   } catch (error) {
