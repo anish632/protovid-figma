@@ -1,17 +1,24 @@
+<!-- Deprecated static source. Production homepage is backend/app/MarketingLanding.tsx. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProtoVid - Client-Ready Figma Prototype Demo Videos</title>
-  <meta name="description" content="ProtoVid records your connected Figma prototype flow — every screen, in order — and exports a client-ready MP4 for reviews, decks, app previews, and handoff. Pro unlocks up to 4K, no watermark, and unlimited exports.">
-  <meta name="keywords" content="figma plugin, prototype videos, client demos, figma export, mp4 export, design tools, prototype automation">
+  <title>Export Figma Prototype to MP4 — ProtoVid</title>
+  <meta name="description" content="Export connected Figma prototype flows to MP4 automatically. No screen recording or editing timeline. Free 720p proofs; Pro adds 1080p, 4K, and no watermark.">
+  <meta name="keywords" content="export Figma prototype to MP4, Figma prototype to video, export Figma prototype, Figma prototype MP4, prototype walkthrough video, Figma plugin">
+  <link rel="canonical" href="https://protovid.dasgroupllc.com/">
   
   <!-- Open Graph -->
-  <meta property="og:title" content="ProtoVid - Client-Ready Figma Prototype Demo Videos">
-  <meta property="og:description" content="Turn connected Figma prototypes into client-ready MP4 videos. No screen recording needed - captures the real flow automatically.">
+  <meta property="og:title" content="Export Figma Prototype to MP4 — ProtoVid">
+  <meta property="og:description" content="Turn connected Figma prototype flows into MP4 walkthroughs automatically. No screen recording or editing timeline.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="../protovid-slide1.png">
+  <meta property="og:url" content="https://protovid.dasgroupllc.com/">
+  <meta property="og:image" content="https://protovid.dasgroupllc.com/logo128x128.png">
+  <meta property="og:image:alt" content="ProtoVid logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Export Figma Prototype to MP4 — ProtoVid">
+  <meta name="twitter:description" content="Turn connected Figma prototype flows into MP4 walkthroughs automatically. No screen recording or editing timeline.">
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -19,9 +26,9 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "ProtoVid",
-    "description": "Figma plugin that converts prototype flows into client-ready MP4 demo videos",
+    "description": "Figma plugin that detects connected prototype flows and exports them as MP4 walkthroughs",
     "applicationCategory": "DesignApplication",
-    "operatingSystem": "Web",
+    "operatingSystem": "Figma",
     "offers": [
       {
         "@type": "Offer",
@@ -36,15 +43,16 @@
         "price": "5",
         "priceCurrency": "USD",
         "billingIncrement": "Month",
-        "description": "Unlimited HD/4K exports, no watermark"
+        "description": "Unlimited 1080p and 4K MP4 exports, no watermark, $5/month subscription"
       }
     ],
     "featureList": [
-      "Prototype flow detection",
-      "MP4 video export", 
-      "720p, 1080p, 4K resolution",
-      "Watermark removal (Pro)",
-      "Client-ready output"
+      "Connected prototype flow detection",
+      "MP4 walkthrough export",
+      "720p Free output",
+      "1080p and 4K Pro output",
+      "Watermark removal with Pro",
+      "Client-ready video output"
     ]
   }
   </script>
@@ -268,6 +276,116 @@
       box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     }
 
+    .demo-window {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: left;
+      background: linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 20px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+
+    .demo-window-top,
+    .demo-output,
+    .demo-step {
+      display: flex;
+      align-items: center;
+    }
+
+    .demo-window-top {
+      justify-content: space-between;
+      padding: 4px 4px 18px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .demo-status,
+    .demo-badge {
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(52,211,153,0.12);
+      color: #6ee7b7;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .demo-flow {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 18px;
+      background: #111827;
+      border-radius: 14px;
+    }
+
+    .demo-frame {
+      min-height: 150px;
+      padding: 14px;
+      background: linear-gradient(160deg, #dbeafe, #a5b4fc 55%, #c4b5fd);
+      border-radius: 12px;
+      color: #1e1b4b;
+      position: relative;
+    }
+
+    .demo-frame:nth-child(2) { background: linear-gradient(160deg, #fce7f3, #f9a8d4 55%, #fecdd3); }
+    .demo-frame:nth-child(3) { background: linear-gradient(160deg, #dcfce7, #86efac 55%, #bbf7d0); }
+
+    .demo-frame strong { display: block; font-size: 13px; }
+    .demo-frame span { display: block; width: 68%; height: 8px; margin-top: 18px; border-radius: 999px; background: rgba(30,27,75,0.25); }
+    .demo-frame span + span { width: 48%; margin-top: 9px; }
+    .demo-arrow { position: absolute; right: -18px; top: 50%; z-index: 1; color: #7c6ef0; font-size: 22px; font-weight: 800; }
+
+    .demo-output {
+      gap: 12px;
+      margin-top: 14px;
+      padding: 14px 16px;
+      background: #fff;
+      border-radius: 12px;
+      color: #0f172a;
+    }
+
+    .demo-play {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      background: #0f172a;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    .demo-output-copy { flex: 1; }
+    .demo-output-copy strong, .demo-output-copy small { display: block; }
+    .demo-output-copy strong { font-size: 13px; }
+    .demo-output-copy small { margin-top: 3px; color: #64748b; font-size: 11px; }
+
+    .demo-steps {
+      padding: 22px;
+      background: linear-gradient(145deg, rgba(124,110,240,0.16), rgba(255,255,255,0.04));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    .demo-step { gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .demo-step:last-child { border-bottom: 0; }
+    .demo-step-number { display: grid; width: 28px; height: 28px; place-items: center; flex: 0 0 28px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 12px; font-weight: 800; }
+    .demo-step strong, .demo-step span { display: block; }
+    .demo-step strong { color: #fff; font-size: 14px; }
+    .demo-step span { margin-top: 3px; color: var(--text-muted); font-size: 12px; }
+
+    .faq {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .faq-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 900px; margin: 0 auto; }
+    .faq-item { padding: 22px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; }
+    .faq-item h3 { color: #fff; font-size: 15px; margin-bottom: 8px; }
+    .faq-item p { color: var(--text-muted); font-size: 14px; line-height: 1.65; }
+
     /* ---- LOGOS / SOCIAL PROOF ---- */
     .social-proof {
       padding: 48px 0;
@@ -391,6 +509,85 @@
       font-size: 14px;
       color: var(--text-muted);
       line-height: 1.7;
+    }
+
+    /* ---- USE CASES ---- */
+    .use-cases {
+      padding: 0 0 100px;
+    }
+
+    .use-cases .section-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .use-cases .section-subtitle {
+      margin: 0 auto;
+    }
+
+    .use-case-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .use-case {
+      padding: 18px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* ---- PRIVACY / TRUST ---- */
+    .privacy {
+      padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .privacy .section-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .privacy .section-subtitle {
+      margin: 0 auto;
+    }
+
+    .privacy-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .privacy-card {
+      padding: 22px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    .privacy-card h3 {
+      color: var(--white);
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .privacy-card p {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .privacy-note {
+      max-width: 820px;
+      margin: 18px auto 0;
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
     }
 
     /* ---- HOW IT WORKS ---- */
@@ -651,6 +848,11 @@
         grid-template-columns: 1fr;
       }
 
+      .use-case-grid,
+      .privacy-grid {
+        grid-template-columns: 1fr;
+      }
+
       .how-grid {
         grid-template-columns: 1fr;
         gap: 40px;
@@ -662,6 +864,8 @@
         grid-template-columns: 1fr;
         max-width: 400px;
       }
+
+      .faq-grid { grid-template-columns: 1fr; }
 
       .pricing-card.featured { transform: none; }
 
@@ -675,22 +879,30 @@
     @media (max-width: 480px) {
       .hero-buttons { flex-direction: column; align-items: center; }
       .hero-buttons .btn { width: 100%; max-width: 280px; }
+      .demo-window { padding: 14px; }
+      .demo-window-top { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .demo-flow { grid-template-columns: 1fr; gap: 22px; }
+      .demo-frame { min-height: 104px; }
+      .demo-arrow { top: auto; right: auto; bottom: -24px; left: 50%; transform: rotate(90deg); }
+      .demo-output { align-items: flex-start; }
     }
   </style>
 </head>
-<body>
+<body data-pro-monthly-price="5" id="top">
 
   <!-- NAV -->
   <nav>
     <div class="container">
-      <a href="/" class="nav-logo">
+      <a href="#top" class="nav-logo">
         <img src="../logo128x128.png" alt="ProtoVid" />
         ProtoVid
       </a>
       <div class="nav-links">
         <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#faq">FAQ</a>
         <a href="#pricing">Pricing</a>
-        <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">Get Pro</a>
+        <a href="https://www.figma.com/community/plugin/1606994616321079154" class="btn btn-primary">Install free</a>
       </div>
     </div>
   </nav>
@@ -698,15 +910,23 @@
   <!-- HERO -->
   <section class="hero">
     <div class="container">
-      <div class="hero-badge">Figma Plugin <span>&mdash; Free to start</span></div>
-      <h1>Client-Ready Prototype Videos.<br><em>From Figma.</em></h1>
-      <p class="subtitle">ProtoVid walks through your connected Figma prototype &mdash; every screen, in order &mdash; and exports a clean MP4 for client reviews, pitch decks, app previews, and stakeholder walkthroughs. Not a folder of static frames: the actual flow, ready to send.</p>
+      <div class="hero-badge">Figma Community plugin <span>&mdash; Free to start</span></div>
+      <h1>Export Figma prototypes<br><em>to MP4.</em></h1>
+      <p class="subtitle">Turn connected Figma prototype flows into polished MP4 walkthroughs automatically &mdash; no screen recording or editing timeline.</p>
       <div class="hero-buttons">
-        <a href="#install" class="btn btn-primary btn-large">Install Plugin &mdash; Free</a>
-        <a href="#features" class="btn btn-secondary btn-large">See Features</a>
+        <a href="https://www.figma.com/community/plugin/1606994616321079154" class="btn btn-primary btn-large">Install from Figma Community</a>
+        <a href="#how-it-works" class="btn btn-secondary btn-large">See how it works</a>
       </div>
       <div class="hero-image">
-        <img src="../protovid-slide1.png" alt="ProtoVid - One click instant video from Figma prototypes" />
+        <div class="demo-window" role="img" aria-label="A connected Figma prototype flow becoming an MP4 walkthrough">
+          <div class="demo-window-top"><span>Connected prototype flow &rarr; MP4</span><span class="demo-status">Flow detected</span></div>
+          <div class="demo-flow">
+            <div class="demo-frame"><strong>Home</strong><span></span><span></span><i class="demo-arrow">→</i></div>
+            <div class="demo-frame"><strong>Checkout</strong><span></span><span></span><i class="demo-arrow">→</i></div>
+            <div class="demo-frame"><strong>Success</strong><span></span><span></span></div>
+          </div>
+          <div class="demo-output"><span class="demo-play">▶</span><div class="demo-output-copy"><strong>prototype-walkthrough.mp4</strong><small>3 connected frames · 720p proof · ProtoVid watermark</small></div><span class="demo-badge">MP4</span></div>
+        </div>
       </div>
     </div>
   </section>
@@ -720,16 +940,16 @@
           <span class="label">H.264 video output</span>
         </div>
         <div class="stat">
-          <span class="number">4K</span>
-          <span class="label">Max resolution</span>
+          <span class="number">720p</span>
+          <span class="label">Free proof output</span>
         </div>
         <div class="stat">
-          <span class="number">HD</span>
-          <span class="label">Client-ready quality</span>
+          <span class="number">1080p / 4K</span>
+          <span class="label">Pro &mdash; no watermark</span>
         </div>
         <div class="stat">
-          <span class="number">$5<span style="font-size:15px;font-weight:500;color:var(--text-muted)">/mo</span></span>
-          <span class="label">Pro &mdash; no watermark, unlimited exports</span>
+          <span class="number" data-pro-price>$5/month</span>
+          <span class="label">Pro monthly price</span>
         </div>
       </div>
     </div>
@@ -740,79 +960,145 @@
     <div class="container">
       <div class="section-header">
         <span class="section-label">Features</span>
-        <h2 class="section-title">Everything you need to send prototype demos</h2>
-        <p class="section-subtitle">No screen recording, no complicated setup. ProtoVid works directly inside Figma.</p>
+        <h2 class="section-title">From connected flow to MP4 walkthrough</h2>
+        <p class="section-subtitle">ProtoVid follows the prototype path you already built in Figma, then gives you a clear proof or client-ready output.</p>
       </div>
       <div class="feature-grid">
         <div class="feature-card">
           <div class="feature-icon">&#x1F50D;</div>
-          <h3>The Flow, Not Just Frames</h3>
-          <p>Free exporters dump a folder of static screens. ProtoVid follows your prototype connections and plays the real flow, screen by screen, in the order people actually click through it.</p>
+          <h3>Automatically detect the flow</h3>
+          <p>ProtoVid finds connected prototype frames on the current Figma page and shows the detected order before you export.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">&#x1F3AC;</div>
-          <h3>H.264 MP4 Export</h3>
-          <p>Server-side transcoding produces industry-standard H.264 MP4 files that play everywhere.</p>
+          <h3>Review before you export</h3>
+          <p>See the connected frames and estimated duration, then choose the output quality that fits the job.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">&#x26A1;</div>
-          <h3>Fast Export Path</h3>
-          <p>Creates MP4 output from captured prototype frames, with fallback transcoding when the browser cannot encode MP4 directly.</p>
+          <h3>Skip the screen recording</h3>
+          <p>Create a downloadable MP4 directly from the connected prototype flow. No editing timeline required.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">&#x1F4D0;</div>
-          <h3>Up to 4K Resolution</h3>
-          <p>Export at 720p for quick sharing, or up to 4K for higher-quality stakeholder presentations.</p>
+          <h3>Client-ready Pro output</h3>
+          <p>Pro unlocks 1080p and 4K MP4 exports without the ProtoVid watermark.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">&#x1F504;</div>
-          <h3>Interaction-Graph Aware</h3>
-          <p>Reads Figma's flow starting points and interaction graph, so branching navigation and multi-screen journeys are captured in sequence &mdash; no manual frame picking.</p>
+          <h3>Built for real use cases</h3>
+          <p>Use the walkthrough for a client review, product demo, design critique, portfolio case study, or stakeholder update.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">&#x1F680;</div>
-          <h3>Simple Export Flow</h3>
-          <p>Enter your email once, choose quality settings, and export a video from inside Figma.</p>
+          <h3>Free proof before you pay</h3>
+          <p>Start with 3 watermarked 720p MP4 exports per month. Upgrade when the final output needs to be client-ready.</p>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- USE CASES -->
+  <section class="use-cases" id="use-cases">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Made for the handoff</span>
+        <h2 class="section-title">Show the prototype in the moments that matter</h2>
+        <p class="section-subtitle">Create a focused prototype walkthrough for the people who need to understand the experience quickly.</p>
+      </div>
+      <div class="use-case-grid">
+        <div class="use-case">Client walkthroughs</div>
+        <div class="use-case">Product demos</div>
+        <div class="use-case">Design reviews</div>
+        <div class="use-case">Portfolio case studies</div>
+        <div class="use-case">Stakeholder updates</div>
+        <div class="use-case">Pitch decks and presentations</div>
+      </div>
+    </div>
+  </section>
+
   <!-- HOW IT WORKS -->
-  <section class="how-it-works">
+  <section class="how-it-works" id="how-it-works">
     <div class="container">
       <div class="how-grid">
         <div>
           <span class="section-label">How it works</span>
-          <h2 class="section-title">Your prototypes, ready to share</h2>
-          <p class="section-subtitle">ProtoVid detects your prototype flow, captures the frames, and exports a shareable video with minimal setup.</p>
+          <h2 class="section-title">Three steps from prototype to MP4</h2>
+          <p class="section-subtitle">Turn a connected Figma prototype into a downloadable walkthrough with a simple export path.</p>
           <div class="steps">
             <div class="step">
               <div class="step-num">1</div>
               <div class="step-text">
-                <h4>Open the plugin</h4>
-                <p>Run ProtoVid from the Figma plugins menu on any page with prototype connections.</p>
+                <h4>Detect</h4>
+                <p>ProtoVid finds the connected prototype flow and shows the frames in order.</p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">2</div>
               <div class="step-text">
-                <h4>Click Export</h4>
-                <p>ProtoVid scans your prototype graph, captures every frame, and encodes the video.</p>
+                <h4>Configure</h4>
+                <p>Review the flow and choose MP4 output quality: 720p Free, or 1080p / 4K Pro.</p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">3</div>
               <div class="step-text">
-                <h4>Download &amp; share</h4>
-                <p>Get an MP4 file you can drop into Slack, Notion, Google Slides, or anywhere else.</p>
+                <h4>Export</h4>
+                <p>Create and download the MP4 walkthrough. Review links are available after export.</p>
               </div>
             </div>
           </div>
         </div>
         <div class="how-image">
-          <img src="../protovid-slide2.png" alt="ProtoVid plugin interface showing prototype flows" />
+          <div class="demo-steps" role="img" aria-label="Three steps: connect frames, export a video, share the MP4">
+            <div class="demo-step"><span class="demo-step-number">1</span><div><strong>Detect the connected flow</strong><span>ProtoVid reads the path you defined in Figma's Prototype panel.</span></div></div>
+            <div class="demo-step"><span class="demo-step-number">2</span><div><strong>Choose output quality</strong><span>Review the frames, then select 720p Free or 1080p / 4K Pro.</span></div></div>
+            <div class="demo-step"><span class="demo-step-number">3</span><div><strong>Download the MP4</strong><span>Use the walkthrough in a review, deck, handoff, or presentation.</span></div></div>
+          </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY / TRUST -->
+  <section class="privacy" id="privacy">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Privacy &amp; data</span>
+        <h2 class="section-title">What happens to your prototype data</h2>
+        <p class="section-subtitle">A plain-language summary of the current implementation.</p>
+      </div>
+      <div class="privacy-grid">
+        <div class="privacy-card">
+          <h3>Scoped to the connected flow</h3>
+          <p>ProtoVid scans prototype connections on the current Figma page and captures only the frames in the selected connected path. It does not scan unrelated files.</p>
+        </div>
+        <div class="privacy-card">
+          <h3>Sent when you export</h3>
+          <p>Captured frames are used in the plugin for local MP4 encoding when supported. If fallback transcoding is needed, the plugin sends the fallback video payload to ProtoVid's encoding endpoint.</p>
+        </div>
+        <div class="privacy-card">
+          <h3>Review links expire</h3>
+          <p>Creating a review link stores the MP4 and review metadata server-side. Free links are available for 7 days; paid links for 30 days. Expired links are no longer served.</p>
+        </div>
+      </div>
+      <p class="privacy-note">The repository does not show an automatic database cleanup job after a link expires, so physical deletion timing and whether customer content is used for training require owner confirmation. Pro payments use Stripe; export and review data use ProtoVid's backend database.</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Questions</span>
+        <h2 class="section-title">Designed for the moment a prototype leaves Figma</h2>
+        <p class="section-subtitle">A simple export path for client delivery and repeat design iteration.</p>
+      </div>
+      <div class="faq-grid">
+        <div class="faq-item"><h3>Do I need to screen record?</h3><p>No. ProtoVid captures connected prototype frames and produces an MP4 walkthrough directly from the plugin.</p></div>
+        <div class="faq-item"><h3>Can I try it before paying?</h3><p>Yes. The Free plan includes 3 watermarked 720p exports each month so you can validate the workflow.</p></div>
+        <div class="faq-item"><h3>When do I need Pro?</h3><p>Upgrade when you need 1080p or 4K output, no watermark, or unlimited exports for ongoing client work.</p></div>
+        <div class="faq-item"><h3>Can I share a review?</h3><p>Yes. After exporting, you can create a browser-based review link with timestamped comments and approval or change-request status. Downloading the MP4 remains the core export path.</p></div>
       </div>
     </div>
   </section>
@@ -822,8 +1108,8 @@
     <div class="container">
       <div class="section-header">
         <span class="section-label">Pricing</span>
-        <h2 class="section-title">Start with free proof exports.</h2>
-        <p class="section-subtitle">Export 3 watermarked 720p MP4s per month for free. Upgrade when you need client-ready HD/4K, no watermark, and repeat exports.</p>
+        <h2 class="section-title">Choose the output you need</h2>
+        <p class="section-subtitle">Free is useful for proof and review. Pro is for a clean, client-ready MP4.</p>
       </div>
       <div class="pricing-grid">
         <div class="pricing-card">
@@ -837,26 +1123,23 @@
             <li><span class="check">&#x2713;</span> 720p resolution</li>
             <li><span class="check">&#x2713;</span> MP4 output</li>
             <li><span class="check">&#x2713;</span> Auto flow detection</li>
-            <li><span class="check">&#x2713;</span> Watermarked export</li>
+            <li><span class="check">&#x2713;</span> ProtoVid watermark</li>
             <li class="disabled"><span class="check">&mdash;</span> 1080p / 4K</li>
           </ul>
-          <a href="#install" class="btn btn-secondary">Get Started</a>
+          <a href="#install" class="btn btn-secondary">Start Free</a>
         </div>
         <div class="pricing-card featured">
           <div class="plan-name">Pro</div>
           <div class="plan-price">
-            <span class="amount">$5</span>
-            <span class="period">/month</span>
+            <span class="amount" data-pro-price>$5/month</span>
           </div>
           <ul class="plan-features">
-            <li><span class="check">&#x2713;</span> Unlimited client-ready exports</li>
-            <li><span class="check">&#x2713;</span> Up to 4K resolution</li>
-            <li><span class="check">&#x2713;</span> HD/4K MP4 output</li>
+            <li><span class="check">&#x2713;</span> 1080p and 4K MP4 output</li>
+            <li><span class="check">&#x2713;</span> No ProtoVid watermark</li>
+            <li><span class="check">&#x2713;</span> Unlimited exports</li>
             <li><span class="check">&#x2713;</span> Auto flow detection</li>
-            <li><span class="check">&#x2713;</span> No watermark for client delivery</li>
-            <li><span class="check">&#x2713;</span> $5/month subscription</li>
           </ul>
-          <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">Upgrade Now</a>
+          <a href="https://protovid.dasgroupllc.com/pricing" class="btn btn-primary">See Pro pricing</a>
         </div>
       </div>
     </div>
@@ -867,9 +1150,10 @@
     <div class="container">
       <span class="section-label">Get started</span>
       <h2 class="section-title">Ready to export your first video?</h2>
-      <p class="section-subtitle">Install ProtoVid from the Figma Community. Start free, then enter your email in the plugin to track exports.</p>
+      <p class="section-subtitle">Install ProtoVid from the Figma Community, connect your prototype flow, and export an MP4 proof in minutes.</p>
       <a href="https://www.figma.com/community/plugin/1606994616321079154" class="btn btn-primary btn-large">Install Figma Plugin</a>
       <p class="cta-hint">Or search "ProtoVid" in Figma's plugin library</p>
+      <p class="cta-hint">Optional convenience: voice control is available after you explicitly choose to use it.</p>
     </div>
   </section>
 
@@ -879,11 +1163,21 @@
       <div class="footer-left">&copy; 2026 ProtoVid by Das Group</div>
       <div class="footer-links">
         <a href="mailto:support@protovid.app">Support</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
+        <a href="#privacy">Privacy &amp; data</a>
+        <a href="https://protovid.dasgroupllc.com/pricing">Pro pricing</a>
       </div>
     </div>
   </footer>
+
+  <script>
+    // Keep the static landing page's displayed price in one visible configuration point.
+    const monthlyPrice = document.body.dataset.proMonthlyPrice;
+    if (monthlyPrice) {
+      document.querySelectorAll('[data-pro-price]').forEach((element) => {
+        element.textContent = `$${monthlyPrice}/month`;
+      });
+    }
+  </script>
 
 </body>
 </html>

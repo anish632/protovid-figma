@@ -17,6 +17,7 @@ const buildCode = () => {
     outfile: 'dist/code.js',
     target: 'es2017',
     platform: 'node',
+    tsconfig: 'tsconfig.json',
     logLevel: 'info',
   });
 };
@@ -29,8 +30,57 @@ const buildUI = () => {
     outfile: 'dist/ui.js',
     target: 'es2020',
     platform: 'browser',
+    tsconfig: 'tsconfig.json',
     jsxFactory: 'h',
     jsxFragment: 'Fragment',
+    logLevel: 'info',
+  });
+};
+
+const buildMatcher = () => {
+  return esbuild.build({
+    entryPoints: ['src/smartAnimateMatcher.ts'],
+    bundle: true,
+    outfile: 'dist/smartAnimateMatcher.js',
+    target: 'es2017',
+    platform: 'node',
+    tsconfig: 'tsconfig.json',
+    logLevel: 'info',
+  });
+};
+
+const buildUIModel = () => {
+  return esbuild.build({
+    entryPoints: ['src/uiModel.ts'],
+    bundle: true,
+    outfile: 'dist/uiModel.js',
+    target: 'es2017',
+    platform: 'node',
+    tsconfig: 'tsconfig.json',
+    logLevel: 'info',
+  });
+};
+
+const buildExportPreflight = () => {
+  return esbuild.build({
+    entryPoints: ['src/exportPreflight.ts'],
+    bundle: true,
+    outfile: 'dist/exportPreflight.js',
+    target: 'es2017',
+    platform: 'node',
+    tsconfig: 'tsconfig.json',
+    logLevel: 'info',
+  });
+};
+
+const buildExportAnalytics = () => {
+  return esbuild.build({
+    entryPoints: ['src/exportAnalytics.ts'],
+    bundle: true,
+    outfile: 'dist/exportAnalytics.js',
+    target: 'es2017',
+    platform: 'node',
+    tsconfig: 'tsconfig.json',
     logLevel: 'info',
   });
 };
@@ -39,7 +89,12 @@ const buildUI = () => {
 const copyUI = () => {
   const html = fs.readFileSync('src/ui.html', 'utf8');
   const js = fs.readFileSync('dist/ui.js', 'utf8');
-  const injected = html.replace('<!-- INJECT_JS -->', `<script>${js}</script>`);
+  const icon = fs.readFileSync('logo128x128.png').toString('base64');
+  const iconDataUrl = `data:image/png;base64,${icon}`;
+  const injected = html
+    .replace('<!-- INJECT_JS -->', `<script>${js}</script>`)
+    .split('__PROTOVID_ICON__')
+    .join(iconDataUrl);
   fs.writeFileSync('dist/ui.html', injected);
 };
 
@@ -47,6 +102,10 @@ const build = async () => {
   try {
     await buildCode();
     await buildUI();
+    await buildMatcher();
+    await buildUIModel();
+    await buildExportPreflight();
+    await buildExportAnalytics();
     copyUI();
     console.log('✅ Build complete');
   } catch (error) {

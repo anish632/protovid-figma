@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createCheckoutSession } from '@/lib/stripe';
 import { checkoutRequestSchema, sanitizeError } from '@/lib/validation';
 import { recordEvent } from '@/lib/events';
-import { getPricingVariantWithPriceId } from '@/lib/pricingExperiment';
+import { getLargeFlowPassForEnvironment, getPricingVariantWithPriceId } from '@/lib/pricingExperiment';
+import { getBillingAccessType, hasActivePaidEntitlement } from '@/lib/billingAccess';
+import { getSubscription } from '@/lib/storage';
 
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200 });
@@ -11,9 +13,60 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = checkoutRequestSchema.parse(body);
-    const selectedPlan = 'monthly';
-    const pricing = getPricingVariantWithPriceId(email, selectedPlan);
+    const {
+      email,
+      plan,
+      anonymousId,
+      offerExperimentId,
+      offerExperimentVariant,
+      primaryOffer,
+    } = checkoutRequestSchema.parse(body);
+    const selectedPlan = plan === 'large_export' ? 'large_export' : 'monthly';
+    const existingSubscription = await getSubscription(email);
+
+    // A paid entitlement includes an active subscription that is already set
+    // to end at period close and a fixed-term Project Pass. Starting a
+    // second Checkout session here creates duplicate charges and makes the
+    // customer's access state ambiguous.
+    if (hasActivePaidEntitlement(existingSubscription)) {
+      const billingAccessType = getBillingAccessType(existingSubscription);
+      try {
+        await recordEvent(email, 'checkout_blocked_active_entitlement', {
+          source: 'checkout',
+          plan: selectedPlan,
+          billing_access_type: billingAccessType,
+          current_period_end: existingSubscription.currentPeriodEnd || null,
+        });
+      } catch (eventError) {
+        console.warn('Could not record blocked checkout event:', eventError);
+      }
+
+      return NextResponse.json(
+        {
+          error: billingAccessType === 'subscription'
+            ? 'You already have an active ProtoVid subscription. Manage it in Stripe instead of starting another checkout.'
+            : 'You already have active non-recurring ProtoVid access. It does not need another checkout yet.',
+          code: 'active_entitlement',
+          billingAccessType,
+          currentPeriodEnd: existingSubscription.currentPeriodEnd || null,
+        },
+        { status: 409 }
+      );
+    }
+
+    const largeFlowPass = selectedPlan === 'large_export'
+      ? getLargeFlowPassForEnvironment()
+      : null;
+    const pricing = selectedPlan === 'large_export'
+      ? largeFlowPass
+      : getPricingVariantWithPriceId(email, selectedPlan);
+
+    if (!pricing) {
+      return NextResponse.json(
+        { error: 'Project Pass is not available yet. Pro is available now.' },
+        { status: 409 }
+      );
+    }
 
     await recordEvent(email, 'pricing_variant_assigned', {
       source: 'checkout',
@@ -21,26 +74,63 @@ export async function POST(request: NextRequest) {
       pricingVariant: pricing.id,
       priceLabel: pricing.label,
       amountCents: pricing.amountCents,
+      accessDays: 'accessDays' in pricing ? pricing.accessDays : null,
+      offer_experiment_id: offerExperimentId || null,
+      offer_experiment_variant: offerExperimentVariant || null,
+      primary_offer: primaryOffer || null,
+      ...(anonymousId ? { anonymousId } : {}),
     });
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || 'http://localhost:3000';
-    const checkoutUrl = await createCheckoutSession({
+    const checkoutSession = await createCheckoutSession({
       priceId: pricing.priceId,
       customerEmail: email,
       successUrl: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${baseUrl}/pricing?canceled=true`,
+      mode: selectedPlan === 'large_export' ? 'payment' : 'subscription',
       metadata: {
         pricing_variant: pricing.id,
         price_label: pricing.label,
         amount_cents: String(pricing.amountCents),
+        offer_type: selectedPlan === 'large_export' ? 'large_flow_pass' : 'subscription',
+        access_days: 'accessDays' in pricing ? String(pricing.accessDays) : '',
+        offer_experiment_id: offerExperimentId || '',
+        offer_experiment_variant: offerExperimentVariant || '',
+        primary_offer: primaryOffer || '',
+        trial_enabled: 'false',
+        ...(anonymousId ? { anonymousId } : {}),
       },
     });
 
+    try {
+      await recordEvent(email, 'checkout_created', {
+        source: 'stripe_checkout_api',
+        plan: selectedPlan,
+        pricing_variant: pricing.id,
+        price_label: pricing.label,
+        amount_cents: pricing.amountCents,
+        offer_type: selectedPlan === 'large_export' ? 'large_flow_pass' : 'subscription',
+        access_days: 'accessDays' in pricing ? pricing.accessDays : null,
+        offer_experiment_id: offerExperimentId || null,
+        offer_experiment_variant: offerExperimentVariant || null,
+        primary_offer: primaryOffer || null,
+        stripe_checkout_session_id: checkoutSession.id,
+        ...(anonymousId ? { anonymousId } : {}),
+      });
+    } catch (eventError) {
+      // The Checkout session is already valid. Do not make a customer retry it
+      // (and risk a duplicate session) because analytics storage is degraded.
+      console.warn('Could not record checkout created event:', eventError);
+    }
+
     return NextResponse.json({
-      url: checkoutUrl,
+      url: checkoutSession.url,
+      sessionId: checkoutSession.id,
       pricingVariant: pricing.id,
       priceLabel: pricing.label,
       amountCents: pricing.amountCents,
+      offerType: selectedPlan === 'large_export' ? 'large_flow_pass' : 'subscription',
+      accessDays: 'accessDays' in pricing ? pricing.accessDays : null,
     });
   } catch (error) {
     console.error('Checkout error:', error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pluginCorsHeaders } from '@/lib/cors';
 import { FREE_TIER_EXPORT_LIMIT, PRO_TIER_EXPORT_LIMIT, getFreeExportsRemaining, isPremiumSubscription } from '@/lib/plans';
 import { getSubscription } from '@/lib/storage';
+import { getBillingAccessType } from '@/lib/billingAccess';
 
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200, headers: pluginCorsHeaders });
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest) {
           tier: subscription.tier,
           customerName: email,
           expiresAt: subscription.currentPeriodEnd,
+          billingAccessKind: getBillingAccessType(subscription),
+          currentPeriodEnd: subscription.currentPeriodEnd || null,
           exportsRemaining: PRO_TIER_EXPORT_LIMIT,
         },
         { headers: pluginCorsHeaders }
@@ -79,6 +82,8 @@ export async function POST(request: NextRequest) {
         customerName: email,
         exportsRemaining,
         freeLimit: FREE_TIER_EXPORT_LIMIT,
+        billingAccessKind: getBillingAccessType(subscription),
+        currentPeriodEnd: subscription.currentPeriodEnd || null,
         message: subscription.tier === 'free'
           ? `Free tier: ${exportsRemaining} exports remaining this month`
           : 'Subscription inactive',

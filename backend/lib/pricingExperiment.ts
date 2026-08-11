@@ -1,7 +1,18 @@
-import { PRO_PRICE_MONTHLY_CENTS, PRO_PRICE_MONTHLY_DISPLAY } from './plans';
+import {
+  LARGE_FLOW_PASS_ACCESS_DAYS,
+  LARGE_FLOW_PASS_CENTS,
+  LARGE_FLOW_PASS_DISPLAY,
+  PRO_PRICE_MONTHLY_CENTS,
+  PRO_PRICE_MONTHLY_DISPLAY,
+} from './plans';
 
-export type BillingPlan = 'monthly' | 'yearly';
+export type BillingPlan = 'monthly' | 'yearly' | 'large_export';
 export type PricingVariantId = 'monthly_5';
+export type OneTimeOfferId = 'large_flow_pass';
+export type OfferExperimentVariant = 'pro_first' | 'project_pass_first';
+export type PrimaryOffer = 'monthly' | 'large_export';
+
+export const OFFER_EXPERIMENT_ID = 'project_pass_primary_v1';
 
 export interface PricingVariant {
   id: PricingVariantId;
@@ -21,6 +32,26 @@ export const MONTHLY_PRICE_5: PricingVariant = {
   priceEnvVars: ['PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'],
 };
 
+export interface OneTimeOffer {
+  id: OneTimeOfferId;
+  plan: 'large_export';
+  label: string;
+  amountCents: number;
+  currency: 'usd';
+  accessDays: number;
+  priceEnvVars: readonly ['PROTOVID_PROJECT_PASS_PRICE_ID', 'PROTOVID_LARGE_EXPORT_PRICE_ID', 'PROTOVID_EXPORT_PACK_PRICE_ID'];
+}
+
+export const LARGE_FLOW_PASS: OneTimeOffer = {
+  id: 'large_flow_pass',
+  plan: 'large_export',
+  label: LARGE_FLOW_PASS_DISPLAY,
+  amountCents: LARGE_FLOW_PASS_CENTS,
+  currency: 'usd',
+  accessDays: LARGE_FLOW_PASS_ACCESS_DAYS,
+  priceEnvVars: ['PROTOVID_PROJECT_PASS_PRICE_ID', 'PROTOVID_LARGE_EXPORT_PRICE_ID', 'PROTOVID_EXPORT_PACK_PRICE_ID'],
+};
+
 function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
@@ -35,6 +66,25 @@ export function stableEmailHash(email: string): number {
   }
 
   return hash >>> 0;
+}
+
+export function getOfferExperimentAssignment(
+  actorKey: string,
+  projectPassAvailable = true,
+): {
+  id: typeof OFFER_EXPERIMENT_ID;
+  variant: OfferExperimentVariant;
+  primaryOffer: PrimaryOffer;
+} {
+  const variant: OfferExperimentVariant = projectPassAvailable && stableEmailHash(actorKey) % 2 === 1
+    ? 'project_pass_first'
+    : 'pro_first';
+
+  return {
+    id: OFFER_EXPERIMENT_ID,
+    variant,
+    primaryOffer: variant === 'project_pass_first' ? 'large_export' : 'monthly',
+  };
 }
 
 export function getMonthlyPricingVariant(email: string): PricingVariant {
@@ -75,4 +125,14 @@ export function getPricingVariantWithPriceId(
     ...variant,
     priceId,
   };
+}
+
+export function getLargeFlowPassForEnvironment(env: NodeJS.ProcessEnv = process.env) {
+  const priceId = LARGE_FLOW_PASS.priceEnvVars
+    .map(envVar => env[envVar]?.trim())
+    .find(Boolean);
+
+  return priceId
+    ? { ...LARGE_FLOW_PASS, priceId }
+    : null;
 }

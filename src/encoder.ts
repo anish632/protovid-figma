@@ -2,11 +2,65 @@
 // Primary: WebCodecs API (VideoEncoder) + mp4-muxer -> H.264 MP4 (no server needed)
 // Fallback: pure-JS MJPEG AVI, then backend FFmpeg transcode to MP4
 
-import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import { Muxer, ArrayBufferTarget, type MuxerOptions } from 'mp4-muxer';
+import { BACKEND_MAX_UPLOAD_BYTES, getPayloadPreflight } from './exportPreflight';
+
+const PLUGIN_VERSION = '1.3.14';
+
+// Screen-level transition metadata captured from prototype reactions. Drives the
+// synthesized "transition effects" (fade/slide) between frames and the
+// best-effort Smart Animate layer overlays.
+interface TransitionMeta {
+  type: string;
+  direction?: string;
+  duration: number; // seconds
+  easing: string;
+  smartAnimateLayers?: SmartAnimateLayerMotion[] | null;
+}
+
+interface LayerBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface SmartAnimateLayerMotion {
+  key: string;
+  source: {
+    id: string;
+    bounds: LayerBounds;
+    opacity: number;
+    rotation: number;
+    imageData?: Uint8Array;
+  };
+  destination: {
+    id: string;
+    bounds: LayerBounds;
+    opacity: number;
+    rotation: number;
+    imageData?: Uint8Array;
+  };
+}
+
 interface FrameInput {
   imageData: Uint8Array;
   width: number;
   height: number;
+  exportScale: number;
+  layers: Array<{
+    id: string;
+    name: string;
+    type: string;
+    keyExact: string;
+    keyLoose: string;
+    keyLeaf: string;
+    bounds: LayerBounds;
+    opacity: number;
+    rotation: number;
+    visible: boolean;
+  }>;
+  transitionIn?: TransitionMeta | null;
 }
 
 interface EncodeSettings {
@@ -15,14 +69,171 @@ interface EncodeSettings {
 
 type ProgressCallback = (percent: number) => void;
 
-// Each prototype frame is held for this many seconds in the output video
+interface EncodeOptions {
+  forceBackend?: boolean;
+  safeMode?: boolean;
+  disableTransitions?: boolean;
+  maxWidth?: number;
+  maxHeight?: number;
+  holdSeconds?: number;
+  jpegQuality?: number;
+  fps?: number;
+  onTelemetry?: (event: EncodeTelemetryEvent) => void;
+}
+
+interface EncodeUserContext {
+  email?: string;
+  resolution?: string;
+  anonymousId?: string;
+  exportId?: string;
+  projectId?: string;
+  plan?: 'free' | 'pro' | 'export_pass';
+  fps?: number;
+  watermarkEnabled?: boolean;
+  firstExport?: boolean;
+}
+
+export interface EncodeTelemetryEvent {
+  eventType: 'payload_preflight_started' | 'payload_preflight_completed' | 'payload_preflight_failed' | 'upload_started' | 'upload_completed';
+  metadata: Record<string, string | number | boolean | null>;
+}
+
+// Output frame rate of the video. Higher than the old 1fps so synthesized
+// transition effects render smoothly.
+const FPS = 30;
+// The backend fallback only reproduces static holds (transitions are disabled
+// there), so a low frame rate keeps the uploaded AVI tiny without changing what
+// the viewer sees. Each still is repeated FALLBACK_FPS * holdSeconds times.
+const FALLBACK_FPS = 1;
+// Vercel serverless functions reject request bodies larger than ~4.5MB, so the
+// AVI we upload for transcoding must stay under this. Fail fast (with a
+// categorized error) instead of burning a doomed multi-second upload.
+// Cap the WebCodecs encode queue so long flows don't accumulate an unbounded
+// backlog of VideoFrames and exhaust memory (a common browser_encode failure).
+const MAX_ENCODE_QUEUE = 8;
+// Each prototype frame is held (static) for this many seconds in the output.
 const FRAME_HOLD_SECONDS = 2;
+// Cap a transition's duration so a misconfigured prototype can't produce a
+// multi-second tween (and balloon frame counts at 4K).
+const MAX_TRANSITION_SECONDS = 1;
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
+const FALLBACK_PROFILES = [
+  {
+    name: 'standard',
+    maxWidth: 1280,
+    maxHeight: 720,
+    holdSeconds: FRAME_HOLD_SECONDS,
+    jpegQuality: 0.62,
+    fps: FALLBACK_FPS,
+  },
+  {
+    name: 'compact',
+    maxWidth: 960,
+    maxHeight: 540,
+    holdSeconds: 1.5,
+    jpegQuality: 0.56,
+    fps: FALLBACK_FPS,
+  },
+  {
+    name: 'minimum',
+    maxWidth: 854,
+    maxHeight: 480,
+    holdSeconds: 1,
+    jpegQuality: 0.5,
+    fps: FALLBACK_FPS,
+  },
+] as const;
+const H264_CODEC_CANDIDATES = [
+  'avc1.42E01E', // Baseline profile, widely supported in Chromium/WebCodecs
+  'avc1.42001f', // Older baseline variant already used by the app
+  'avc1.640028', // High profile fallback for browsers that prefer it
+] as const;
+
+function pickWebCodecsBitrate(width: number, height: number): number {
+  const pixels = width * height;
+  if (pixels >= 3840 * 2160) return 10_000_000;
+  if (pixels >= 1920 * 1080) return 6_000_000;
+  return 3_000_000;
+}
+
+async function pickSupportedH264Config(width: number, height: number): Promise<VideoEncoderConfig> {
+  const baseConfig = {
+    width,
+    height,
+    bitrate: pickWebCodecsBitrate(width, height),
+    framerate: FPS,
+    avc: { format: 'avc' as const },
+  };
+
+  for (const codec of H264_CODEC_CANDIDATES) {
+    const candidate = { codec, ...baseConfig };
+    try {
+      if (typeof VideoEncoder.isConfigSupported === 'function') {
+        const supported = await VideoEncoder.isConfigSupported(candidate);
+        if (supported?.supported) return candidate;
+      } else {
+        return candidate;
+      }
+    } catch (_error) {
+      // Try the next codec candidate.
+    }
+  }
+
+  throw new Error('No supported H.264 WebCodecs configuration found');
+}
 
 async function loadPNG(data: Uint8Array): Promise<ImageBitmap> {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as any);
-  const blob = new Blob([bytes], { type: 'image/png' });
-  return createImageBitmap(blob);
+
+  // Try createImageBitmap first if available
+  if (typeof createImageBitmap !== 'undefined') {
+    try {
+      const blob = new Blob([bytes], { type: 'image/png' });
+      return await createImageBitmap(blob);
+    } catch (error) {
+      // Fall through to canvas-based approach
+    }
+  }
+
+  // Web-compatible fallback: decode via an <img> element and return a mock
+  // ImageBitmap that carries the element for drawing.
+  return new Promise((resolve, reject) => {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const base64 = btoa(binary);
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    const img = new Image();
+    img.onload = () => {
+      resolve({
+        width: img.width,
+        height: img.height,
+        close: () => {},
+        _imageElement: img,
+        [Symbol.toStringTag]: 'ImageBitmap'
+      } as any);
+    };
+    img.onerror = () => reject(new Error('Failed to decode PNG data'));
+    img.src = dataUrl;
+  });
+}
+
+// Resolve a loadPNG result into something ctx.drawImage accepts.
+function resolveDrawable(bmp: any): CanvasImageSource {
+  if (typeof ImageBitmap !== 'undefined' && bmp instanceof ImageBitmap) return bmp as any;
+  if (bmp && bmp._imageElement) return bmp._imageElement;
+  return bmp;
+}
+
+function closeDrawable(bmp: any) {
+  if (bmp && typeof bmp.close === 'function') bmp.close();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function canvasToJPEG(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array> {
@@ -39,10 +250,10 @@ function canvasToJPEG(canvas: HTMLCanvasElement, quality: number): Promise<Uint8
 }
 
 function drawWatermark(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  const fontSize = Math.max(16, Math.round(height * 0.028));
+  const fontSize = Math.max(14, Math.round(height * 0.022));
   ctx.save();
 
-  const barHeight = fontSize * 2.2;
+  const barHeight = fontSize * 2.4;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
   ctx.fillRect(0, height - barHeight, width, barHeight);
 
@@ -50,31 +261,341 @@ function drawWatermark(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-  ctx.fillText('Made with love by ProtoVid - protovid.dasgroupllc.com', width / 2, height - barHeight / 2);
+
+  const text = 'Made with love by ProtoVid - protovid.dasgroupllc.com';
+  const textWidth = ctx.measureText(text).width;
+
+  if (textWidth > width * 0.9) {
+    ctx.fillText('Made with love by ProtoVid', width / 2, height - barHeight / 2);
+  } else {
+    ctx.fillText(text, width / 2, height - barHeight / 2);
+  }
 
   ctx.restore();
 }
 
+// ─── Transition effects ──────────────────────────────────────────────────────
+
+interface TransitionPlan {
+  kind: 'crossfade' | 'slide' | 'cut' | 'smart-animate';
+  push: boolean;       // both frames move (PUSH) vs incoming slides over a static one
+  direction: string;   // LEFT | RIGHT | TOP | BOTTOM
+  frames: number;      // number of tween frames to emit
+  easing: string;
+  smartAnimateLayers?: SmartAnimateLayerMotion[] | null;
+}
+
+// Map a captured transition to a concrete tween plan. Smart Animate uses a
+// crossfade baseline plus layer overlays when capture data is available.
+// Unknown types default to crossfade; INSTANT is a hard cut.
+function planTransition(trans: TransitionMeta | null | undefined): TransitionPlan {
+  const none: TransitionPlan = { kind: 'cut', push: false, direction: 'LEFT', frames: 0, easing: 'LINEAR' };
+  if (!trans || !trans.type) return none;
+
+  let kind: TransitionPlan['kind'];
+  switch (trans.type) {
+    case 'DISSOLVE':
+    case 'SCROLL_ANIMATE':
+      kind = 'crossfade';
+      break;
+    case 'SMART_ANIMATE':
+      kind = trans.smartAnimateLayers && trans.smartAnimateLayers.length > 0 ? 'smart-animate' : 'crossfade';
+      break;
+    case 'MOVE_IN':
+    case 'MOVE_OUT':
+    case 'PUSH':
+    case 'SLIDE_IN':
+    case 'SLIDE_OUT':
+      kind = 'slide';
+      break;
+    case 'INSTANT':
+      return none;
+    default:
+      kind = 'crossfade';
+  }
+
+  const dur = Math.min(Math.max(trans.duration || 0.3, 0), MAX_TRANSITION_SECONDS);
+  const frames = Math.round(dur * FPS);
+  if (frames <= 0) return none;
+
+  return {
+    kind,
+    push: trans.type === 'PUSH',
+    direction: trans.direction || 'LEFT',
+    frames,
+    easing: trans.easing || 'EASE_OUT',
+    smartAnimateLayers: trans.smartAnimateLayers || null,
+  };
+}
+
+// Eased progress in [0,1] for a linear input in [0,1].
+function applyEasing(t: number, easing: string): number {
+  switch (easing) {
+    case 'LINEAR':
+      return t;
+    case 'EASE_IN':
+      return t * t;
+    case 'EASE_OUT':
+      return t * (2 - t);
+    case 'EASE_IN_AND_OUT':
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    case 'EASE_IN_BACK': {
+      const c1 = 1.70158;
+      return (c1 + 1) * t * t * t - c1 * t * t;
+    }
+    case 'EASE_OUT_BACK': {
+      const c1 = 1.70158;
+      return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    default:
+      return t * (2 - t); // ease-out feel for GENTLE/QUICK/BOUNCY/custom/etc.
+  }
+}
+
+function drawStill(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  originalWidth: number,
+  originalHeight: number,
+  img: CanvasImageSource
+) {
+  ctx.clearRect(0, 0, width, height);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(img, (width - originalWidth) / 2, (height - originalHeight) / 2, originalWidth, originalHeight);
+}
+
+function drawTransitionFrame(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  originalWidth: number,
+  originalHeight: number,
+  prevImg: CanvasImageSource,
+  curImg: CanvasImageSource,
+  plan: TransitionPlan,
+  e: number
+) {
+  const ox = (width - originalWidth) / 2;
+  const oy = (height - originalHeight) / 2;
+  ctx.clearRect(0, 0, width, height);
+  ctx.globalAlpha = 1;
+
+  if (plan.kind === 'crossfade' || plan.kind === 'smart-animate') {
+    ctx.drawImage(prevImg, ox, oy, originalWidth, originalHeight);
+    ctx.globalAlpha = e;
+    ctx.drawImage(curImg, ox, oy, originalWidth, originalHeight);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  // slide: incoming frame enters from the edge implied by direction
+  let ux = 0, uy = 0;
+  switch (plan.direction) {
+    case 'RIGHT': ux = -1; break;
+    case 'LEFT': ux = 1; break;
+    case 'TOP': uy = 1; break;
+    case 'BOTTOM': uy = -1; break;
+    default: ux = 1;
+  }
+
+  if (plan.push) {
+    ctx.drawImage(prevImg, ox - ux * width * e, oy - uy * height * e, originalWidth, originalHeight);
+  } else {
+    ctx.drawImage(prevImg, ox, oy, originalWidth, originalHeight);
+  }
+  ctx.drawImage(curImg, ox + ux * width * (1 - e), oy + uy * height * (1 - e), originalWidth, originalHeight);
+}
+
+function drawAsset(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  bounds: LayerBounds,
+  opacity: number,
+  rotation: number
+) {
+  if (bounds.width <= 0 || bounds.height <= 0 || opacity <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.translate(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+  ctx.drawImage(image, -bounds.width / 2, -bounds.height / 2, bounds.width, bounds.height);
+  ctx.restore();
+}
+
+async function getDecodedAsset(
+  data: Uint8Array | undefined,
+  cache: WeakMap<Uint8Array, Promise<any>>
+): Promise<any | null> {
+  if (!data) return null;
+  let entry = cache.get(data);
+  if (!entry) {
+    entry = loadPNG(data);
+    cache.set(data, entry);
+  }
+  return await entry;
+}
+
+// ─── Shared timeline walker ──────────────────────────────────────────────────
+
+// Frames are processed one at a time, keeping only the previous and current
+// decoded images in memory (never the full tween sequence). `emit(canvas, n)`
+// is called by each sink to commit the current canvas n times — holds reuse a
+// single composed canvas so they cost nothing extra to repeat.
+async function renderTimeline(
+  frames: FrameInput[],
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  originalWidth: number,
+  originalHeight: number,
+  addWatermark: boolean,
+  onProgress: ProgressCallback,
+  emit: (canvas: HTMLCanvasElement, repeat: number) => Promise<void>,
+  options: EncodeOptions = {}
+): Promise<void> {
+  const holdSeconds = options.holdSeconds ?? FRAME_HOLD_SECONDS;
+  const fps = options.fps ?? FPS;
+  const holdFrames = Math.max(1, Math.round(holdSeconds * fps));
+  let prev: any = null;
+  const bitmapCache = new WeakMap<Uint8Array, Promise<any>>();
+
+  for (let i = 0; i < frames.length; i++) {
+    const cur = await loadPNG(frames[i].imageData);
+    const curImg = resolveDrawable(cur);
+
+    if (prev && i > 0) {
+      const plan = options.disableTransitions
+        ? planTransition(null)
+        : planTransition(frames[i].transitionIn);
+      if (plan.frames > 0) {
+        const prevImg = resolveDrawable(prev);
+        for (let f = 1; f <= plan.frames; f++) {
+          const linearT = f / (plan.frames + 1);
+          const e = applyEasing(linearT, plan.easing);
+          drawTransitionFrame(ctx, width, height, originalWidth, originalHeight, prevImg, curImg, plan, e);
+
+          if (plan.kind === 'smart-animate' && plan.smartAnimateLayers && plan.smartAnimateLayers.length > 0) {
+            for (const layer of plan.smartAnimateLayers) {
+              const sourceBmp = await getDecodedAsset(layer.source.imageData, bitmapCache);
+              const destBmp = await getDecodedAsset(layer.destination.imageData, bitmapCache);
+              if (sourceBmp) {
+                drawAsset(
+                  ctx,
+                  resolveDrawable(sourceBmp),
+                  layer.source.bounds,
+                  (1 - e) * Math.max(layer.source.opacity, 0),
+                  layer.source.rotation
+                );
+              }
+              if (destBmp) {
+                drawAsset(
+                  ctx,
+                  resolveDrawable(destBmp),
+                  layer.destination.bounds,
+                  e * Math.max(layer.destination.opacity, 0),
+                  layer.destination.rotation
+                );
+              }
+            }
+          }
+
+          if (addWatermark) drawWatermark(ctx, width, height);
+          await emit(canvas, 1);
+        }
+      }
+    }
+
+    drawStill(ctx, width, height, originalWidth, originalHeight, curImg);
+    if (addWatermark) drawWatermark(ctx, width, height);
+    await emit(canvas, holdFrames);
+
+    if (prev) closeDrawable(prev);
+    prev = cur;
+    onProgress(20 + ((i + 1) / frames.length) * 70);
+  }
+
+  if (prev) closeDrawable(prev);
+}
+
 // ─── Primary path: H.264 MP4 via WebCodecs ───────────────────────────────────
+
+// Ensure dimensions are even for H.264 compatibility
+function padDimensions(width: number, height: number): { width: number; height: number } {
+  return {
+    width: width + (width % 2),
+    height: height + (height % 2)
+  };
+}
+
+function fitDimensions(
+  width: number,
+  height: number,
+  maxWidth?: number,
+  maxHeight?: number
+): { width: number; height: number } {
+  if (!maxWidth && !maxHeight) return { width, height };
+
+  const widthScale = maxWidth ? maxWidth / width : 1;
+  const heightScale = maxHeight ? maxHeight / height : 1;
+  const scale = Math.min(1, widthScale, heightScale);
+
+  return {
+    width: Math.max(2, Math.round(width * scale)),
+    height: Math.max(2, Math.round(height * scale)),
+  };
+}
+
+async function getFirstFrameDimensions(frames: FrameInput[]): Promise<{ width: number; height: number }> {
+  const first = await loadPNG(frames[0].imageData);
+  const width = first.width;
+  const height = first.height;
+  closeDrawable(first);
+  return { width, height };
+}
+
+function createCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to create canvas context');
+  return { canvas, ctx };
+}
 
 async function encodeMP4WebCodecs(
   frames: FrameInput[],
   onProgress: ProgressCallback,
-  addWatermark: boolean
-): Promise<Uint8Array> {
-  const first = await loadPNG(frames[0].imageData);
-  const width = first.width;
-  const height = first.height;
-  first.close();
-
-  const fps = 1;
+  addWatermark: boolean,
+  options: EncodeOptions = {}
+): Promise<{ data: Uint8Array; width: number; height: number }> {
+  const firstDimensions = await getFirstFrameDimensions(frames);
+  const targetDimensions = fitDimensions(
+    firstDimensions.width,
+    firstDimensions.height,
+    options.maxWidth,
+    options.maxHeight
+  );
+  const { width, height } = padDimensions(targetDimensions.width, targetDimensions.height);
+  const supportedConfig = await pickSupportedH264Config(width, height);
 
   const target = new ArrayBufferTarget();
-  const muxer = new Muxer({
+  const muxerOptions: MuxerOptions<ArrayBufferTarget> & {
+    metadata: Record<string, string>;
+  } = {
     target,
-    video: { codec: 'avc', width, height, frameRate: fps },
+    video: { codec: 'avc', width, height, frameRate: FPS },
     fastStart: 'in-memory',
-  });
+    metadata: {
+      title: 'Figma Prototype Video',
+      description: 'Created with ProtoVid - Figma prototype video exporter',
+      generator: 'ProtoVid v1.2.1 (https://protovid.dasgroupllc.com)',
+      comment: 'Professional prototype videos for client presentations'
+    }
+  };
+  const muxer = new Muxer(muxerOptions);
 
   let encodeError: Error | null = null;
   const encoder = new VideoEncoder({
@@ -82,52 +603,66 @@ async function encodeMP4WebCodecs(
     error: (e) => { encodeError = e; },
   });
 
-  encoder.configure({
-    codec: 'avc1.42001f', // H.264 Baseline Profile Level 3.1
-    width,
-    height,
-    bitrate: 2_000_000,
-    framerate: fps,
-    avc: { format: 'avc' },
-  });
+  encoder.configure(supportedConfig);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to create canvas context');
+  const { canvas, ctx } = createCanvas(width, height);
 
   let frameIndex = 0;
-  for (let i = 0; i < frames.length; i++) {
+  const usPerFrame = 1_000_000 / FPS;
+  // A keyframe roughly every 2s keeps the MP4 seekable.
+  const keyframeInterval = FPS * 2;
+
+  const emit = async (cnv: HTMLCanvasElement, repeat: number) => {
     if (encodeError) throw encodeError;
 
-    const bmp = await loadPNG(frames[i].imageData);
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(bmp, 0, 0, width, height);
-    bmp.close();
+    // Backpressure: let the encoder drain before queuing more frames so long
+    // flows don't build an unbounded VideoFrame backlog and run out of memory.
+    while (encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
+      await sleep(4);
+      if (encodeError) throw encodeError;
+    }
 
-    if (addWatermark) drawWatermark(ctx, width, height);
+    let snapshot: ImageBitmap | HTMLCanvasElement;
+    try {
+      snapshot = await createImageBitmap(cnv);
+    } catch (_e) {
+      snapshot = cnv;
+    }
 
-    const snapshot = await createImageBitmap(canvas);
-    for (let t = 0; t < FRAME_HOLD_SECONDS; t++) {
+    for (let r = 0; r < repeat; r++) {
       const videoFrame = new VideoFrame(snapshot, {
-        timestamp: frameIndex * 1_000_000,
-        duration: 1_000_000,
+        timestamp: Math.round(frameIndex * usPerFrame),
+        duration: Math.round(usPerFrame),
       });
-      encoder.encode(videoFrame, { keyFrame: frameIndex === 0 });
+      encoder.encode(videoFrame, { keyFrame: frameIndex % keyframeInterval === 0 });
       videoFrame.close();
       frameIndex++;
     }
-    snapshot.close();
 
-    onProgress(20 + ((i + 1) / frames.length) * 75);
-  }
+    if (snapshot !== cnv && typeof (snapshot as ImageBitmap).close === 'function') {
+      (snapshot as ImageBitmap).close();
+    }
+  };
+
+  await renderTimeline(
+    frames,
+    ctx,
+    canvas,
+    width,
+    height,
+    targetDimensions.width,
+    targetDimensions.height,
+    addWatermark,
+    onProgress,
+    emit,
+    options
+  );
 
   await encoder.flush();
   if (encodeError) throw encodeError;
   muxer.finalize();
 
-  return new Uint8Array(target.buffer);
+  return { data: new Uint8Array(target.buffer), width, height };
 }
 
 // ─── Fallback path: MJPEG AVI (pure JS, no browser APIs needed) ──────────────
@@ -206,62 +741,230 @@ function buildMJPEGAVI(
 async function encodeAVIFallback(
   frames: FrameInput[],
   onProgress: ProgressCallback,
-  addWatermark: boolean
-): Promise<{ data: Uint8Array; ext: string; mime: string }> {
-  const first = await loadPNG(frames[0].imageData);
-  const width = first.width;
-  const height = first.height;
-  first.close();
+  addWatermark: boolean,
+  options: EncodeOptions = {}
+): Promise<{ data: Uint8Array; ext: string; mime: string; width: number; height: number }> {
+  const firstDimensions = await getFirstFrameDimensions(frames);
+  const targetDimensions = fitDimensions(
+    firstDimensions.width,
+    firstDimensions.height,
+    options.maxWidth,
+    options.maxHeight
+  );
+  const { width, height } = padDimensions(targetDimensions.width, targetDimensions.height);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to create canvas context');
-
-  const fps = 1;
+  const { canvas, ctx } = createCanvas(width, height);
   const jpegFrames: Uint8Array[] = [];
 
-  for (let i = 0; i < frames.length; i++) {
-    const bmp = await loadPNG(frames[i].imageData);
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(bmp, 0, 0, width, height);
-    bmp.close();
+  // Holds reuse a single JPEG reference, so repeating a static frame does not
+  // duplicate its bytes in memory until the AVI buffer is assembled.
+  const emit = async (cnv: HTMLCanvasElement, repeat: number) => {
+    const jpeg = await canvasToJPEG(cnv, options.jpegQuality ?? 0.9);
+    for (let r = 0; r < repeat; r++) jpegFrames.push(jpeg);
+  };
 
-    if (addWatermark) drawWatermark(ctx, width, height);
-
-    const jpeg = await canvasToJPEG(canvas, 0.92);
-    for (let t = 0; t < FRAME_HOLD_SECONDS; t++) jpegFrames.push(jpeg);
-
-    onProgress(20 + ((i + 1) / frames.length) * 75);
-  }
+  await renderTimeline(
+    frames,
+    ctx,
+    canvas,
+    width,
+    height,
+    targetDimensions.width,
+    targetDimensions.height,
+    addWatermark,
+    onProgress,
+    emit,
+    options
+  );
 
   return {
-    data: buildMJPEGAVI(jpegFrames, width, height, fps),
+    data: buildMJPEGAVI(jpegFrames, width, height, options.fps ?? FPS),
     ext: 'avi',
     mime: 'video/avi',
+    width,
+    height,
   };
 }
 
-async function transcodeAVIToMP4(data: Uint8Array): Promise<Uint8Array> {
-  const response = await fetch(`${BACKEND_URL}/api/encode-video`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'video/avi' },
-    body: data.buffer as ArrayBuffer,
-  });
+async function transcodeAVIToMP4(
+  data: Uint8Array,
+  resolution?: string,
+  frameCount?: number,
+  anonymousId?: string,
+  exportId?: string,
+  projectId?: string,
+  options: EncodeOptions = {},
+): Promise<{ data: Uint8Array; uploadDurationMs: number | null; transcodeDurationMs: number | null }> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'video/avi'
+  };
 
-  if (!response.ok) {
+  // Preserve compatibility headers used by the backend for routing and usage
+  // tracking, but do not send the user email from the client encoder.
+  if (resolution) headers['x-resolution'] = resolution;
+  if (frameCount) headers['x-frame-count'] = frameCount.toString();
+  if (anonymousId) headers['x-anonymous-id'] = anonymousId;
+  if (exportId) headers['x-export-id'] = exportId;
+  if (projectId) headers['x-project-id'] = projectId;
+  headers['x-plugin-version'] = PLUGIN_VERSION;
+
+  const body = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let response: Response;
+    const uploadStartedAt = Date.now();
+    options.onTelemetry?.({
+      eventType: 'upload_started',
+      metadata: {
+        export_id: exportId || null,
+        payload_bytes: data.byteLength,
+        retry_attempt: attempt,
+      },
+    });
+    try {
+      response = await fetch(`${BACKEND_URL}/api/encode-video`, {
+        method: 'POST',
+        headers,
+        body,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Network request failed';
+      if (attempt < maxAttempts) {
+        await sleep(500);
+        continue;
+      }
+      throw new Error(`BACKEND_TRANSCODE: ${message}`);
+    }
+
+    if (response.ok) {
+      const result = new Uint8Array(await response.arrayBuffer());
+      options.onTelemetry?.({
+        eventType: 'upload_completed',
+        metadata: {
+          export_id: exportId || null,
+          payload_bytes: data.byteLength,
+          upload_duration_ms: Date.now() - uploadStartedAt,
+          transcode_duration_ms: Number(response.headers.get('x-processing-time')) || null,
+          retry_attempt: attempt,
+        },
+      });
+      return {
+        data: result,
+        uploadDurationMs: Date.now() - uploadStartedAt,
+        transcodeDurationMs: Number(response.headers.get('x-processing-time')) || null,
+      };
+    }
+
     let message = 'MP4 conversion failed. Please try again.';
+    let backendErrorCode: string | null = null;
+    let inputSizeMB: number | null = null;
+    let backendFrameCount: number | null = null;
+    let backendResolution: string | null = null;
+
     try {
       const error = await response.json();
       if (error?.error) message = error.error;
+      if (error?.code) backendErrorCode = String(error.code);
+      if (error?.inputSizeMB !== undefined) inputSizeMB = error.inputSizeMB;
+      if (error?.frameCount !== undefined) backendFrameCount = error.frameCount;
+      if (error?.resolution) backendResolution = error.resolution;
     } catch (_e) {
-      // Keep the generic error.
+      message = `Server returned HTTP ${response.status}`;
     }
-    throw new Error(message);
+
+    const retryable = response.status >= 500 || response.status === 429 || response.status === 408;
+    if (attempt < maxAttempts && retryable) {
+      await sleep(750);
+      continue;
+    }
+
+    // Include context in the error message for better diagnostics
+    const contextParts = [
+      `msg:${message}`,
+      backendErrorCode ? `code:${backendErrorCode}` : null,
+      inputSizeMB ? `size:${inputSizeMB}mb` : null,
+      backendFrameCount ? `frames:${backendFrameCount}` : null,
+      backendResolution ? `res:${backendResolution}` : null
+    ].filter(Boolean);
+
+    throw new Error(`BACKEND_TRANSCODE: ${contextParts.join('|')}`);
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  throw new Error('BACKEND_TRANSCODE: MP4 conversion failed after retry');
+}
+
+async function buildFallbackUpload(
+  frames: FrameInput[],
+  onProgress: ProgressCallback,
+  addWatermark: boolean,
+  effectiveOptions: EncodeOptions,
+  userContext?: EncodeUserContext
+): Promise<{ data: Uint8Array; ext: string; mime: string; width: number; height: number; profileName: string }> {
+  let largestRejected: { sizeMB: string; profileName: string } | null = null;
+  effectiveOptions.onTelemetry?.({
+    eventType: 'payload_preflight_started',
+    metadata: {
+      export_id: userContext?.exportId || null,
+      frame_count: frames.length,
+      max_payload_bytes: BACKEND_MAX_UPLOAD_BYTES,
+      resolution: userContext?.resolution || null,
+    },
+  });
+
+  for (const profile of FALLBACK_PROFILES) {
+    const fallbackOptions: EncodeOptions = {
+      ...effectiveOptions,
+      disableTransitions: true,
+      maxWidth: Math.min(effectiveOptions.maxWidth ?? profile.maxWidth, profile.maxWidth),
+      maxHeight: Math.min(effectiveOptions.maxHeight ?? profile.maxHeight, profile.maxHeight),
+      holdSeconds: Math.min(effectiveOptions.holdSeconds ?? profile.holdSeconds, profile.holdSeconds),
+      jpegQuality: Math.min(effectiveOptions.jpegQuality ?? profile.jpegQuality, profile.jpegQuality),
+      fps: Math.min(effectiveOptions.fps ?? profile.fps, profile.fps),
+    };
+    const result = await encodeAVIFallback(frames, onProgress, addWatermark, fallbackOptions);
+    if (result.ext !== 'avi' || result.mime !== 'video/avi') {
+      throw new Error('Video conversion failed');
+    }
+    const preflight = getPayloadPreflight(result.data.byteLength, BACKEND_MAX_UPLOAD_BYTES);
+    if (preflight.status !== 'too_large') {
+      effectiveOptions.onTelemetry?.({
+        eventType: 'payload_preflight_completed',
+        metadata: {
+          export_id: userContext?.exportId || null,
+          payload_bytes: preflight.payloadBytes,
+          max_payload_bytes: preflight.maxBytes,
+          profile: profile.name,
+          status: preflight.status,
+        },
+      });
+      return { ...result, profileName: profile.name };
+    }
+
+    largestRejected = {
+      sizeMB: (result.data.byteLength / (1024 * 1024)).toFixed(1),
+      profileName: profile.name,
+    };
+    onProgress(Math.min(95, 88 + FALLBACK_PROFILES.indexOf(profile) * 3));
+  }
+
+  const sizeMB = largestRejected?.sizeMB || 'unknown';
+  const profileName = largestRejected?.profileName || 'unknown';
+  const largestBytes = largestRejected ? Math.round(Number(largestRejected.sizeMB) * 1024 * 1024) : null;
+  effectiveOptions.onTelemetry?.({
+    eventType: 'payload_preflight_failed',
+    metadata: {
+      export_id: userContext?.exportId || null,
+      payload_bytes: largestBytes,
+      max_payload_bytes: BACKEND_MAX_UPLOAD_BYTES,
+      failure_reason: 'payload_too_large',
+      profile: profileName,
+    },
+  });
+  throw new Error(
+    `BACKEND_TRANSCODE: msg:AVI payload too large to upload [payload_too_large]` +
+    `|size:${sizeMB}mb|frames:${frames.length}|res:${userContext?.resolution ?? 'unknown'}|profile:${profileName}|hint:optimize_before_render`
+  );
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -269,41 +972,102 @@ async function transcodeAVIToMP4(data: Uint8Array): Promise<Uint8Array> {
 /**
  * Encode prototype frames to video.
  * Tries H.264 MP4 via WebCodecs first; falls back to backend MP4 transcode.
+ * Synthesized screen transition effects (fade/slide) are inserted between
+ * frames based on each frame's captured prototype transition.
  * @param isPremium - when false, a watermark is burned into the video
+ * @param userContext - optional user information for usage monitoring
  */
 export async function encodeVideo(
   frames: FrameInput[],
   settings: EncodeSettings,
   onProgress: ProgressCallback,
-  isPremium: boolean = false
-): Promise<{ url: string; filename: string }> {
+  isPremium: boolean = false,
+  userContext?: EncodeUserContext,
+  options: EncodeOptions = {}
+): Promise<{
+  url: string;
+  filename: string;
+  width: number;
+  height: number;
+  deliveryProfile: 'requested' | 'fallback';
+  fileSizeBytes: number;
+  payloadBytes?: number | null;
+  uploadDurationMs?: number | null;
+  transcodeDurationMs?: number | null;
+}> {
   if (!frames.length) throw new Error('No frames to encode');
 
   const addWatermark = !isPremium;
-
   const stamp = Date.now();
+  const effectiveOptions: EncodeOptions = options.safeMode
+    ? {
+        forceBackend: true,
+        disableTransitions: true,
+        maxWidth: 1280,
+        maxHeight: 720,
+        holdSeconds: 1,
+        jpegQuality: 0.82,
+        ...options,
+      }
+    : options;
 
   // 1. Try WebCodecs H.264 MP4 first (best compatibility)
-  if (typeof VideoEncoder !== 'undefined') {
+  if (!effectiveOptions.forceBackend && typeof VideoEncoder !== 'undefined') {
     try {
-      const mp4Data = await encodeMP4WebCodecs(frames, onProgress, addWatermark);
-      const blob = new Blob([mp4Data as unknown as BlobPart], { type: 'video/mp4' });
+      const mp4 = await encodeMP4WebCodecs(frames, onProgress, addWatermark, effectiveOptions);
+      const blob = new Blob([mp4.data as unknown as BlobPart], { type: 'video/mp4' });
       onProgress(100);
-      return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
+      return {
+        url: URL.createObjectURL(blob),
+        filename: `protovid-export-${stamp}.mp4`,
+        width: mp4.width,
+        height: mp4.height,
+      deliveryProfile: effectiveOptions.maxWidth || effectiveOptions.maxHeight ? 'fallback' : 'requested',
+      fileSizeBytes: blob.size,
+        payloadBytes: null,
+        uploadDurationMs: null,
+        transcodeDurationMs: null,
+      };
     } catch (_e) {
-      // H.264 unavailable — try VP8 next
+      // H.264 unavailable — fall back to backend transcode.
     }
-
-    // VP8/WebM is intentionally skipped here so the product delivers the MP4
-    // format promised in the marketplace listing.
   }
 
-  // 2. Fallback: MJPEG AVI -> backend FFmpeg -> H.264 MP4
-  const { data, ext, mime } = await encodeAVIFallback(frames, onProgress, addWatermark);
-  if (ext !== 'avi' || mime !== 'video/avi') throw new Error('Video conversion failed');
+  // 2. Fallback: MJPEG AVI -> backend FFmpeg -> H.264 MP4.
+  // The backend has a hard upload cap, so the fallback is always encoded lean:
+  // no transitions, 720p-capped, low frame rate. This is what the majority of
+  // failing exports funnel into (users whose browser lacks H.264 WebCodecs),
+  // so keeping the AVI small is the difference between success and a rejected
+  // upload — the output is a static slideshow either way.
+  const fallback = await buildFallbackUpload(
+    frames,
+    onProgress,
+    addWatermark,
+    effectiveOptions,
+    userContext
+  );
+
   onProgress(96);
-  const mp4Data = await transcodeAVIToMP4(data);
-  const blob = new Blob([mp4Data as unknown as BlobPart], { type: 'video/mp4' });
+  const transcode = await transcodeAVIToMP4(
+    fallback.data,
+    userContext?.resolution,
+    frames.length,
+    userContext?.anonymousId,
+    userContext?.exportId,
+    userContext?.projectId,
+    effectiveOptions,
+  );
+  const blob = new Blob([transcode.data as unknown as BlobPart], { type: 'video/mp4' });
   onProgress(100);
-  return { url: URL.createObjectURL(blob), filename: `protovid-export-${stamp}.mp4` };
+  return {
+    url: URL.createObjectURL(blob),
+    filename: `protovid-export-${stamp}.mp4`,
+    width: fallback.width,
+    height: fallback.height,
+    deliveryProfile: 'fallback',
+    fileSizeBytes: blob.size,
+    payloadBytes: fallback.data.byteLength,
+    uploadDurationMs: transcode.uploadDurationMs,
+    transcodeDurationMs: transcode.transcodeDurationMs,
+  };
 }

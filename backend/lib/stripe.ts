@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) throw new Error('STRIPE_SECRET_KEY not configured');
   return new Stripe(key, {
@@ -13,13 +13,14 @@ export async function createCheckoutSession(params: {
   customerEmail: string;
   successUrl: string;
   cancelUrl: string;
+  mode?: 'subscription' | 'payment';
   metadata?: Record<string, string>;
+  trialDays?: number;
 }) {
   const stripe = getStripe();
+  const mode = params.mode || 'subscription';
   
-  // TODO: Verify the Stripe Dashboard product/price copy says
-  // "Subscribe to ProtoVid Pro" and "Unlimited exports with 1080p/4K support".
-  const session = await stripe.checkout.sessions.create({
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer_email: params.customerEmail,
     line_items: [
       {
@@ -27,16 +28,32 @@ export async function createCheckoutSession(params: {
         quantity: 1,
       },
     ],
-    mode: 'subscription',
+    mode,
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     metadata: {
       email: params.customerEmail,
+      trial_days: String(params.trialDays || 0),
       ...params.metadata,
     },
-  });
+  };
 
-  return session.url;
+  // Add trial period if specified
+  if (mode === 'subscription' && params.trialDays && params.trialDays > 0) {
+    sessionParams.subscription_data = {
+      trial_period_days: params.trialDays,
+    };
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  if (!session.url) {
+    throw new Error('Stripe did not return a checkout URL');
+  }
+
+  return {
+    id: session.id,
+    url: session.url,
+  };
 }
 
 export async function createPortalSession(customerId: string, returnUrl: string) {
@@ -53,6 +70,11 @@ export async function createPortalSession(customerId: string, returnUrl: string)
 export async function retrieveCheckoutSession(sessionId: string) {
   const stripe = getStripe();
   return stripe.checkout.sessions.retrieve(sessionId);
+}
+
+export async function retrieveSubscription(subscriptionId: string) {
+  const stripe = getStripe();
+  return stripe.subscriptions.retrieve(subscriptionId);
 }
 
 export function verifyWebhook(body: string, signature: string): Stripe.Event {

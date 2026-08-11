@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { SuccessConfirmation } from './SuccessConfirmation';
 
 export default async function SuccessPage({
@@ -10,21 +11,65 @@ export default async function SuccessPage({
 
   return (
     <main style={{
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-      maxWidth: 640,
-      margin: '96px auto',
-      padding: '0 24px',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+      minHeight: '100vh',
+      padding: '72px 24px',
+      background: 'linear-gradient(180deg, #08111f 0%, #111827 100%)',
+      color: '#e5e7eb',
       textAlign: 'center',
-      lineHeight: 1.5,
     }}>
-      <h1 style={{ fontSize: 36, marginBottom: 12 }}>ProtoVid Pro is active</h1>
-      <SuccessConfirmation sessionId={sessionId} />
-      <p style={{ color: '#555', fontSize: 18, marginBottom: 24 }}>
-        Return to Figma. The ProtoVid plugin will detect your payment and unlock Pro automatically.
-      </p>
-      <p style={{ color: '#777', fontSize: 14 }}>
-        If the plugin does not update within a minute, close and reopen ProtoVid with the same email address.
-      </p>
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
+        <div style={{
+          display: 'inline-flex',
+          padding: '8px 14px',
+          borderRadius: 999,
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: '#cbd5e1',
+          fontSize: 13,
+          marginBottom: 24,
+        }}>
+          Payment status
+        </div>
+        <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)', lineHeight: 1.02, letterSpacing: '-0.04em', margin: 0, color: '#fff' }}>
+          ProtoVid Pro is active.
+        </h1>
+        <div style={{ marginTop: 18 }}>
+          <SuccessConfirmation sessionId={sessionId} />
+        </div>
+        <p style={{ marginTop: 10, fontSize: 18, lineHeight: 1.7, color: '#cbd5e1' }}>
+          Return to Figma. The plugin will detect your payment automatically and unlock HD/4K, no watermark, and unlimited exports.
+        </p>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 28 }}>
+          <Link href="/pricing" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '14px 22px',
+            borderRadius: 12,
+            background: '#7c6ef0',
+            color: '#fff',
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}>
+            Back to pricing
+          </Link>
+          <Link href="/account" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '14px 22px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: '#fff',
+            fontWeight: 600,
+            textDecoration: 'none',
+            background: 'rgba(255,255,255,0.04)',
+          }}>
+            Manage account
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }

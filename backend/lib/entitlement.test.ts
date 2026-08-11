@@ -21,7 +21,7 @@ test('free entitlement allows backend-configured watermarked exports', () => {
   assert.equal(entitlement.freeExportsLimit, 3);
   assert.equal(entitlement.freeExportsUsed, 0);
   assert.equal(entitlement.freeExportsRemaining, 3);
-  assert.equal(formatQuotaText(entitlement), '3 of 3 free watermarked exports left this month');
+  assert.equal(formatQuotaText(entitlement), '3 free exports remaining this month');
 });
 
 test('free entitlement blocks export when the backend quota is exhausted', () => {
@@ -36,7 +36,7 @@ test('free entitlement blocks export when the backend quota is exhausted', () =>
   assert.equal(entitlement.canExport, false);
   assert.equal(entitlement.upgradeRequired, true);
   assert.equal(entitlement.freeExportsRemaining, 0);
-  assert.equal(formatQuotaText(entitlement), 'No free exports left this month');
+  assert.equal(formatQuotaText(entitlement), 'No free exports remaining this month');
 });
 
 test('paid entitlement wins even when free quota is zero', () => {
@@ -53,7 +53,7 @@ test('paid entitlement wins even when free quota is zero', () => {
   assert.equal(entitlement.watermarkRequired, false);
   assert.equal(entitlement.upgradeRequired, false);
   assert.equal(entitlement.freeExportsRemaining, 0);
-  assert.equal(formatQuotaText(entitlement), 'Unlimited exports included with your plan');
+  assert.equal(formatQuotaText(entitlement), 'Unlimited exports included');
 });
 
 test('UI quota helper uses backend values and has no fallback to three', () => {
@@ -70,7 +70,7 @@ test('UI quota helper uses backend values and has no fallback to three', () => {
   };
 
   assert.doesNotMatch(formatQuotaText(entitlement), /\b3\b/);
-  assert.match(formatQuotaText(entitlement), /\b1 of 1\b/);
+  assert.equal(formatQuotaText(entitlement), '1 free export remaining this month');
 });
 
 test('UI quota helper displays three when the backend entitlement returns three', () => {
@@ -82,5 +82,5 @@ test('UI quota helper displays three when the backend entitlement returns three'
     lastResetMonth: '2026-06',
   }, billingDate);
 
-  assert.match(formatQuotaText(entitlement), /\b3 of 3\b/);
+  assert.equal(formatQuotaText(entitlement), '3 free exports remaining this month');
 });

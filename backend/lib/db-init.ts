@@ -55,6 +55,54 @@ async function initDatabase() {
     await sql`ALTER TABLE protovid_subscriptions ADD COLUMN IF NOT EXISTS first_export_date DATE`;
 
     console.log('✅ Ensured trial tracking columns on protovid_subscriptions');
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS protovid_event_dedupes (
+        event_id VARCHAR(255) PRIMARY KEY,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    console.log('✅ Ensured analytics event deduplication table');
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_protovid_events_created_at
+      ON protovid_events(created_at DESC)
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_protovid_events_type_created_at
+      ON protovid_events(event_type, created_at DESC)
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_protovid_events_lower_email
+      ON protovid_events(LOWER(email))
+    `;
+    console.log('✅ Ensured analytics query indexes');
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS protovid_shares (
+        id VARCHAR(32) PRIMARY KEY,
+        email VARCHAR(255),
+        anonymous_id VARCHAR(128),
+        filename VARCHAR(255) NOT NULL,
+        resolution VARCHAR(32) NOT NULL DEFAULT '720p',
+        frame_count INTEGER NOT NULL DEFAULT 0,
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
+        video_data BYTEA NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        experiment_variant VARCHAR(32),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        view_count INTEGER NOT NULL DEFAULT 0
+      )
+    `;
+    await sql`
+      ALTER TABLE protovid_shares
+      ADD COLUMN IF NOT EXISTS experiment_variant VARCHAR(32)
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_protovid_shares_expires_at
+      ON protovid_shares(expires_at)
+    `;
+    console.log('✅ Ensured hosted share table');
     
     // Test query
     const result = await sql`SELECT COUNT(*) as count FROM protovid_subscriptions`;

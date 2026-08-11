@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProtoVid UI harness</title>
+  <style>
+    html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; overflow: hidden; }
+    body { background: #d9dde7; }
+    iframe { display: block; background: #f3f5fa; }
+  </style>
+</head>
+<body>
+  <iframe id="plugin" src="../dist/ui.html" title="ProtoVid plugin preview"></iframe>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const previewState = params.get('state') || 'detected';
+    const exportOutcome = params.get('exportOutcome') || 'success';
+    const restoreOutcome = params.get('restoreOutcome') || 'success';
+    const frameCount = Number(params.get('frames') || (previewState === 'one-frame' ? 1 : 3));
+    const plugin = document.getElementById('plugin');
+    const previewVideoUrl = URL.createObjectURL(new Blob([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])], { type: 'video/mp4' }));
+    window.__harnessStats = { exportRequests: 0, checkoutRequests: 0 };
+
+    const freeEntitlement = {
+      userId: 'preview-user',
+      billingPeriodKey: '2026-07',
+      subscriptionStatus: 'none',
+      isPaid: false,
+      freeExportsLimit: 3,
+      freeExportsUsed: previewState === 'limit' ? 3 : previewState === 'one-left' ? 2 : 0,
+      freeExportsRemaining: previewState === 'limit' ? 0 : previewState === 'one-left' ? 1 : 3,
+      watermarkRequired: true,
+      canExport: previewState !== 'limit',
+      upgradeRequired: previewState === 'limit',
+      billingAccessKind: 'none',
+      currentPeriodEnd: null,
+    };
+
+    const proEntitlement = {
+      ...freeEntitlement,
+      subscriptionStatus: 'active',
+      isPaid: true,
+      freeExportsRemaining: 0,
+      watermarkRequired: false,
+      canExport: true,
+      upgradeRequired: false,
+      billingAccessKind: 'subscription',
+      currentPeriodEnd: '2026-08-11T00:00:00.000Z',
+    };
+
+    const path = {
+      id: 'path:home>checkout>success',
+      frameIds: Array.from({ length: frameCount }, (_, index) => `frame-${index + 1}`),
+      frameCount,
+      startNodeId: 'frame-1',
+      endNodeId: `frame-${frameCount}`,
+      startNodeName: 'Home',
+      endNodeName: frameCount === 1 ? 'Home' : 'Success',
+      label: `Home → ${frameCount === 1 ? 'Home' : 'Success'}`,
+      estimatedDuration: frameCount * 2,
+      preflight: { status: frameCount >= 50 ? 'split_recommended' : 'ready', message: null },
+      truncated: previewState === 'looped',
+      truncationReason: previewState === 'looped' ? 'loop_detected' : null,
+    };
+
+    const alternatePath = {
+      ...path,
+      id: 'path:home>settings>success',
+      frameIds: path.frameIds.map((id, index) => index === 1 ? 'frame-settings' : id),
+      startNodeName: 'Home',
+      endNodeName: 'Settings',
+      label: 'Home → Settings',
+    };
+
+    function send(type, data) {
+      plugin.contentWindow.postMessage({ pluginMessage: { type, data } }, '*');
+    }
+
+    function initPayload() {
+      const hasPrototype = previewState !== 'empty';
+      const isPro = previewState === 'pro';
+      const paths = previewState === 'branching' ? [path, alternatePath] : hasPrototype ? [path] : [];
+      const entitlementUnavailable = previewState === 'entitlement-error' || previewState === 'offline';
+      return {
+        hasPrototype,
+        frameCount: hasPrototype ? frameCount : 0,
+        paths,
+        pathSelectionRequired: previewState === 'branching',
+        defaultPathId: previewState === 'branching' ? null : hasPrototype ? path.id : null,
+        flow: {
+          totalFrames: hasPrototype ? frameCount : 0,
+          estimatedDuration: frameCount * 2,
+          hasTransitions: true,
+          pathCount: paths.length,
+          mixedDimensions: previewState === 'mixed',
+          pathEnumerationTruncated: false,
+        },
+        savedEmail: isPro ? 'designer@example.com' : '',
+        pendingCheckout: null,
+        entitlement: entitlementUnavailable ? null : isPro ? proEntitlement : freeEntitlement,
+        entitlementError: entitlementUnavailable,
+        trialExpired: false,
+        daysSinceFirstExport: null,
+      };
+    }
+
+    function showSuccess(isPremium = false) {
+      send('preview-state', {
+        stage: 'complete',
+        hasPrototype: true,
+        isPremium,
+        entitlement: isPremium ? proEntitlement : freeEntitlement,
+        activeExportFrameCount: frameCount,
+        activeExportAttemptId: 'preview-attempt',
+        videoUrl: previewVideoUrl,
+        downloadFilename: 'checkout-onboarding-client-walkthrough-v12-final.mp4',
+        outputWidth: isPremium ? 1920 : 1280,
+        outputHeight: isPremium ? 1080 : 720,
+        deliveryProfile: 'requested',
+        fileSizeBytes: 8421376,
+        exportStartedAt: Date.now() - 4200,
+        downloadStarted: true,
+        progress: { stage: 'finalizing', percent: 100 },
+      });
+    }
+
+    window.addEventListener('message', (event) => {
+      const message = event.data && event.data.pluginMessage;
+      if (!message) return;
+
+      if (message.type === 'init') {
+        send('init-complete', initPayload());
+        if (previewState === 'progress') {
+          setTimeout(() => send('preview-state', {
+            stage: 'exporting',
+            activeExportFrameCount: frameCount,
+            exportStartedAt: Date.now() - 7400,
+            progress: { stage: 'encoding', percent: 67 },
+          }), 50);
+        }
+        if (previewState === 'success') setTimeout(() => showSuccess(false), 50);
+        if (previewState === 'failure') setTimeout(() => send('preview-state', {
+          stage: 'setup',
+          error: 'network timeout: internal preview diagnostic',
+        }), 50);
+        if (previewState === 'invalid') setTimeout(() => send('error', {
+          message: 'The selected frame order is no longer connected. Scan again and choose a current path.',
+        }), 50);
+        if (previewState === 'unsupported') setTimeout(() => send('error', {
+          message: 'Could not capture a frame with visible content.',
+        }), 50);
+        if (previewState === 'offline') setTimeout(() => send('entitlement-error', {
+          message: 'You appear to be offline. Reconnect and try again.',
+        }), 50);
+        if (previewState === 'checkout-opening') setTimeout(() => send('preview-state', {
+          stage: 'setup', checkoutState: 'opening',
+        }), 50);
+        if (previewState === 'checkout-pending') setTimeout(() => send('preview-state', {
+          stage: 'checking-payment', checkoutState: 'pending', userEmail: 'designer@example.com',
+        }), 50);
+        if (previewState === 'checkout-cancelled') setTimeout(() => send('preview-state', {
+          stage: 'setup', checkoutState: 'cancelled', notice: 'Checkout was not confirmed. Your flow and settings are unchanged.',
+        }), 50);
+        if (previewState === 'checkout-error') setTimeout(() => send('preview-state', {
+          stage: 'setup', checkoutState: 'error', error: 'checkout_internal_error: hidden diagnostic', userEmail: 'designer@example.com',
+        }), 50);
+      }
+
+      if (message.type === 'scan-prototype') {
+        setTimeout(() => send('scan-complete', {
+          frames: path.frameIds.map((id, index) => ({ id, name: index === 0 ? 'Home' : `Frame ${index + 1}`, width: 1440, height: 900 })),
+          flow: initPayload().flow,
+          paths: [path],
+          pathSelectionRequired: false,
+          defaultPathId: path.id,
+        }), 80);
+      }
+
+      if (message.type === 'export-video') {
+        window.__harnessStats.exportRequests += 1;
+        send('progress', { stage: 'capturing', percent: 32 });
+        setTimeout(() => send('progress', { stage: 'encoding', percent: 68 }), 120);
+        setTimeout(() => {
+          if (exportOutcome === 'failure') {
+            send('error', { message: 'network timeout: hidden backend details' });
+          } else {
+            showSuccess(false);
+          }
+        }, 360);
+      }
+
+      if (message.type === 'open-checkout' || message.type === 'resume-checkout') {
+        window.__harnessStats.checkoutRequests += 1;
+        send('checkout-opened', {
+          url: 'https://example.invalid/preview-checkout',
+          email: message.data.email || 'designer@example.com',
+          plan: message.data.plan || 'monthly',
+        });
+        setTimeout(() => send('preview-state', {
+          stage: 'setup',
+          isPremium: true,
+          entitlement: proEntitlement,
+          userEmail: message.data.email || 'designer@example.com',
+          paymentCheckAvailable: false,
+          pendingCheckoutUrl: '',
+          pendingCheckoutEmail: '',
+          pendingCheckoutPlan: '',
+          checkoutState: 'success',
+          notice: 'Pro is active. Client-ready resolutions are now available.',
+        }), 250);
+      }
+
+      if (message.type === 'save-email') {
+        const restored = restoreOutcome === 'success';
+        setTimeout(() => send('email-saved', {
+          email: message.data.email,
+          entitlement: restored ? proEntitlement : freeEntitlement,
+          trialExpired: false,
+          daysSinceFirstExport: null,
+        }), 160);
+        if (!restored) {
+          setTimeout(() => send('error', { message: 'purchase lookup failed: hidden backend details' }), 200);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

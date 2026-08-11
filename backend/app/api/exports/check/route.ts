@@ -4,6 +4,7 @@ import { buildEntitlementResponse, getBillingPeriodKey } from '@/lib/entitlement
 import { getSubscription, setSubscription } from '@/lib/storage';
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 import { withRateLimit, generalRateLimit } from '@/lib/rateLimit';
+import { getBillingAccessType } from '@/lib/billingAccess';
 
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200, headers: pluginCorsHeaders });
@@ -35,6 +36,8 @@ async function handlePOST(request: NextRequest) {
         exportsThisMonth: entitlement.freeExportsUsed,
         limit: entitlement.freeExportsLimit,
         isPremium: entitlement.isPaid,
+        billingAccessKind: getBillingAccessType(subscription),
+        currentPeriodEnd: subscription.currentPeriodEnd || null,
         trialExpired: false,
         daysSinceFirstExport: subscription.firstExportDate
           ? Math.floor((new Date().getTime() - new Date(subscription.firstExportDate).getTime()) / (1000 * 60 * 60 * 24))

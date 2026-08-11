@@ -9,12 +9,31 @@ Add these to your Vercel project settings (Settings → Environment Variables):
 STRIPE_SECRET_KEY=<your-stripe-restricted-api-key>
 STRIPE_WEBHOOK_SECRET=<your-stripe-webhook-signing-secret>
 PROTOVID_PRICE_ID=<your-stripe-price-id>
+PROTOVID_PROJECT_PASS_PRICE_ID=<your-stripe-$4-one-time-price-id>
 ```
 
 ### App Configuration
 ```
 NEXT_PUBLIC_APP_URL=<your-vercel-production-url>
+BILLING_MANAGEMENT_TOKEN_SECRET=<32-byte-random-secret>
+CRON_SECRET=<32-byte-random-secret-for-expired-share-cleanup>
 ```
+
+### Secure billing recovery (recommended)
+
+Completed Stripe Checkout sessions can mint a device-scoped management token.
+To give existing customers a secure recovery path after they reinstall the
+plugin, configure an email sender for one-time Stripe Portal links:
+
+```
+RESEND_API_KEY=<your-resend-api-key>
+BILLING_MANAGEMENT_EMAIL_FROM=ProtoVid <billing@your-domain.com>
+BILLING_SUPPORT_EMAIL=support@your-domain.com
+```
+
+Without the Resend variables, email-only portal and cancellation requests stay
+blocked; customers are directed to support rather than being authorized by an
+email address alone.
 
 ### Database Configuration
 ```
@@ -66,6 +85,7 @@ vercel --prod
 - [ ] Test Stripe webhook events (subscription updates)
 - [ ] Verify export count increments persist across cold starts
 - [ ] Check that free tier limits reset monthly
+- [ ] Verify the daily cleanup cron deletes expired review videos and comments
 
 ## Stripe Webhook
 

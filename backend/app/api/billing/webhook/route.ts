@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { verifyWebhook } from '@/lib/stripe';
+import { retrieveSubscription, verifyWebhook } from '@/lib/stripe';
 import { setSubscription, findSubscriptionByCustomerId, findSubscriptionBySubscriptionId } from '@/lib/storage';
 import { getCheckoutEmail, getCheckoutEventMetadata, getCheckoutSubscriptionUpdate } from '@/lib/checkoutConfirmation';
 import Stripe from 'stripe';
@@ -58,9 +58,32 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        await setSubscription(email, getCheckoutSubscriptionUpdate(session));
+        const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
+        let subscriptionUpdate = getCheckoutSubscriptionUpdate(session);
+
+        if (subscriptionId) {
+          try {
+            const stripeSubscription = await retrieveSubscription(subscriptionId);
+            const periodEnd = (stripeSubscription as any).current_period_end;
+            subscriptionUpdate = {
+              tier: ['active', 'trialing'].includes(stripeSubscription.status) ? 'pro' : 'free',
+              status: stripeSubscription.status as any,
+              stripeCustomerId: typeof session.customer === 'string' ? session.customer : undefined,
+              stripeSubscriptionId: stripeSubscription.id,
+              currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
+            };
+          } catch (error) {
+            console.warn('Failed to fetch Stripe subscription after checkout completion:', error);
+          }
+        }
+
+        await setSubscription(email, subscriptionUpdate);
         const eventMetadata = getCheckoutEventMetadata(session, 'stripe_webhook', 'checkout.session.completed');
-        await recordEvent(email, 'subscription_started', eventMetadata);
+        if (session.metadata?.offer_type === 'large_flow_pass') {
+          await recordEvent(email, 'large_flow_pass_purchased', eventMetadata);
+        } else {
+          await recordEvent(email, 'subscription_started', eventMetadata);
+        }
         await recordEvent(email, 'checkout_completed', eventMetadata);
         await recordEvent(email, 'payment_confirmed', eventMetadata);
         break;
@@ -77,6 +100,7 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        const previousState = await findSubscriptionBySubscriptionId(subscription.id);
         const isActive = ['active', 'trialing'].includes(subscription.status);
         const periodEnd = (subscription as any).current_period_end;
         await setSubscription(existing.email, {
@@ -85,6 +109,35 @@ export async function POST(request: NextRequest) {
           stripeSubscriptionId: subscription.id,
           currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
         });
+
+        // Track trial events
+        if (subscription.status === 'trialing') {
+          await recordEvent(existing.email, 'trial_started', {
+            trial_end: subscription.trial_end,
+            subscription_id: subscription.id,
+          });
+        } else if (subscription.status === 'active' && event.type === 'customer.subscription.updated') {
+          // Check if this was a trial conversion
+          if (previousState?.status === 'trialing') {
+            await recordEvent(existing.email, 'trial_converted', {
+              subscription_id: subscription.id,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+
+        const existing = await findSubscriptionByCustomerId(customerId);
+        if (existing) {
+          await recordEvent(existing.email, 'trial_ending_soon', {
+            trial_end: subscription.trial_end,
+            subscription_id: subscription.id,
+          });
+        }
         break;
       }
 

@@ -4,6 +4,7 @@ import { FREE_TIER_EXPORT_LIMIT, isPremiumSubscription } from '@/lib/plans';
 import { getSubscription, incrementExportCount } from '@/lib/storage';
 import { exportCheckRequestSchema, sanitizeError } from '@/lib/validation';
 import { pluginCorsHeaders } from '@/lib/cors';
+import { getBillingAccessType } from '@/lib/billingAccess';
 
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200, headers: pluginCorsHeaders });
@@ -25,6 +26,8 @@ export async function POST(request: NextRequest) {
         {
           success: true,
           ...entitlement,
+          billingAccessKind: getBillingAccessType(existing),
+          currentPeriodEnd: existing.currentPeriodEnd || null,
           exportsThisMonth: entitlement.freeExportsUsed,
           limit: entitlement.freeExportsLimit,
         },
@@ -42,6 +45,8 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           ...entitlement,
+          billingAccessKind: getBillingAccessType(existing),
+          currentPeriodEnd: existing.currentPeriodEnd || null,
           exportsThisMonth,
           limit: FREE_TIER_EXPORT_LIMIT,
           error: 'Free export limit reached',
@@ -57,6 +62,8 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         ...entitlement,
+        billingAccessKind: getBillingAccessType(subscription),
+        currentPeriodEnd: subscription.currentPeriodEnd || null,
         exportsThisMonth: entitlement.freeExportsUsed,
         limit: entitlement.freeExportsLimit,
       },

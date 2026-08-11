@@ -1,10 +1,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  OFFER_EXPERIMENT_ID,
+  getLargeFlowPassForEnvironment,
   getMonthlyPricingVariant,
+  getOfferExperimentAssignment,
   getPricingVariant,
   getPricingVariantWithPriceId,
 } from './pricingExperiment.js';
+
+test('Project Pass primary experiment assignment is stable for an actor', () => {
+  const first = getOfferExperimentAssignment('pv_actor_123');
+  const second = getOfferExperimentAssignment('pv_actor_123');
+
+  assert.deepEqual(first, second);
+  assert.equal(first.id, OFFER_EXPERIMENT_ID);
+  assert.equal(['pro_first', 'project_pass_first'].includes(first.variant), true);
+  assert.equal(first.primaryOffer, first.variant === 'project_pass_first' ? 'large_export' : 'monthly');
+});
+
+test('Project Pass experiment falls back to Pro first when the pass is unavailable', () => {
+  assert.deepEqual(getOfferExperimentAssignment('pv_actor_123', false), {
+    id: OFFER_EXPERIMENT_ID,
+    variant: 'pro_first',
+    primaryOffer: 'monthly',
+  });
+});
 
 test('monthly pricing cohort is stable for normalized email', () => {
   const first = getMonthlyPricingVariant(' Designer@Example.com ');
@@ -43,4 +64,17 @@ test('yearly requests are normalized to the current monthly Pro offer', () => {
 
   assert.equal(getPricingVariant('designer@example.com', 'yearly').id, 'monthly_5');
   assert.equal(getPricingVariantWithPriceId('designer@example.com', 'yearly', env).priceId, 'price_monthly_5');
+});
+
+test('Project Pass uses the dedicated one-time price before legacy env vars', () => {
+  const env = {
+    PROTOVID_PROJECT_PASS_PRICE_ID: 'price_project_pass',
+    PROTOVID_LARGE_EXPORT_PRICE_ID: 'price_legacy_pass',
+  } as unknown as NodeJS.ProcessEnv;
+
+  const pass = getLargeFlowPassForEnvironment(env);
+  assert.equal(pass?.priceId, 'price_project_pass');
+  assert.equal(pass?.label, '$4 once');
+  assert.equal(pass?.amountCents, 400);
+  assert.equal(pass?.accessDays, 7);
 });

@@ -29,6 +29,7 @@ export const apiKeySchema = z.string()
 export const eventTypeSchema = z.enum([
   'plugin_load',
   'plugin_opened',
+  'session_opened',
   'first_open',
   'onboarding_started',
   'onboarding_completed',
@@ -38,36 +39,106 @@ export const eventTypeSchema = z.enum([
   'email_captured',
   'export_setup_viewed',
   'export_settings_changed',
+  'export_settings_viewed',
   'format_interest',
   'download_clicked',
+  'download_started',
+  'share_clicked',
+  'export_another_clicked',
+  'client_review_link_clicked',
+  'copy_export_details_clicked',
+  'resolution_selected',
   'checkout_email_prompt_shown',
+  'post_success_email_prompt_shown',
+  'post_success_email_save_clicked',
+  'post_success_email_dismissed',
   'payment_poll_started',
   'payment_poll_timeout',
   'payment_status_checked',
   'export',
   'export_clicked',
   'export_started',
+  'export_ready',
   'export_completed',
   'export_succeeded',
   'export_success',
   'export_blocked',
   'export_failed',
+  'export_safe_retry_started',
+  'export_safe_retry_succeeded',
+  'export_safe_retry_failed',
+  'payload_preflight_started',
+  'payload_preflight_completed',
+  'payload_preflight_failed',
+  'upload_started',
+  'upload_completed',
+  'transcode_started',
+  'transcode_completed',
+  'flow_detection_started',
+  'flow_detected',
+  'flow_detection_failed',
   'prototype_detected',
   'prototype_frames_detected',
+  'prototype_path_selected',
+  'prototype_path_auto_selected',
+  'upsell_card_viewed',
+  'upsell_viewed',
+  'selected_paid_feature',
+  'upgrade_viewed',
   'paywall_viewed',
   'pricing_variant_assigned',
   'review_prompt_shown',
   'review_prompt_clicked',
+  'review_feedback_positive',
+  'review_feedback_not_yet',
+  'path_selection_prompted',
+  'social_share_clicked',
+  'share_link_requested',
+  'share_link_created',
+  'share_link_copied',
+  'share_link_failed',
+  'review_invite_link_copied',
+  'review_invite_experiment_exposed',
+  'review_invite_panel_shown',
+  'review_invite_native_share_clicked',
+  'review_invite_native_share_completed',
+  'review_invite_native_share_failed',
+  'review_invite_email_clicked',
+  'share_page_viewed',
+  'review_room_opened',
+  'review_comment_created',
+  'review_status_updated',
+  'viral_growth_action',
   'checkout_start',
   'checkout_started',
+  'checkout_created',
   'checkout_opened',
   'checkout_completed',
+  'checkout_cancelled',
   'checkout_error',
+  'checkout_recovered',
+  'checkout_blocked_active_entitlement',
   'upgrade_clicked',
+  'export_success_upsell_opportunity',
+  'power_user_detected',
+  'moderate_user_detected',
+  'power_user_post_export',
+  'moderate_user_post_export',
+  'subscription_cancelled',
+  'subscription_cancellation_scheduled',
   'subscription_started',
+  'billing_management_token_issued',
+  'billing_management_link_requested',
+  'purchase_restore_started',
+  'purchase_restored',
+  'purchase_restore_failed',
+  'trial_started',
+  'trial_converted',
+  'trial_ending_soon',
   'license_validate',
   'license_validation',
-  'payment_confirmed'
+  'payment_confirmed',
+  'payment_completed'
 ]);
 
 // Plugin version validation
@@ -136,7 +207,17 @@ export const licenseValidationRequestSchema = z.object({
 
 export const checkoutRequestSchema = z.object({
   email: emailSchema,
-  plan: z.enum(['monthly', 'yearly']).optional()
+  plan: z.enum(['monthly', 'yearly', 'large_export']).optional(),
+  anonymousId: z.string().min(1).max(128).optional(),
+  offerExperimentId: z.string().min(1).max(64).optional(),
+  offerExperimentVariant: z.enum(['pro_first', 'project_pass_first']).optional(),
+  primaryOffer: z.enum(['monthly', 'large_export']).optional(),
+});
+
+export const pricingVariantRequestSchema = z.object({
+  email: emailSchema.optional(),
+  plan: z.enum(['monthly', 'yearly', 'large_export']).optional(),
+  anonymousId: z.string().min(1).max(128).optional(),
 });
 
 export const checkoutSessionConfirmationSchema = z.object({
@@ -144,6 +225,15 @@ export const checkoutSessionConfirmationSchema = z.object({
     .min(1, 'Checkout session is required')
     .max(255, 'Checkout session is too long')
     .regex(/^cs_(test|live)_[A-Za-z0-9_]+$/, 'Invalid checkout session')
+});
+
+// Account-management actions intentionally do not accept an email address.
+// A bearer token can only be minted after Stripe confirms a completed payment.
+export const billingManagementRequestSchema = z.object({
+  managementToken: z.string()
+    .trim()
+    .min(32, 'Billing management token is required')
+    .max(4096, 'Billing management token is too long'),
 });
 
 export const exportUserIdSchema = z.string()

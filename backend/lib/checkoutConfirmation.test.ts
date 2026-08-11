@@ -47,6 +47,7 @@ test('checkout confirmation builds active Pro entitlement update', () => {
     status: 'active',
     stripeCustomerId: 'cus_123',
     stripeSubscriptionId: 'sub_123',
+    currentPeriodEnd: undefined,
   });
 });
 
@@ -76,5 +77,55 @@ test('checkout event metadata preserves pricing variant attribution', () => {
     pricing_variant: 'monthly_5',
     price_label: '$5/mo',
     amount_cents: '500',
+    offer_type: null,
+    access_days: null,
+    offer_experiment_id: null,
+    offer_experiment_variant: null,
+    primary_offer: null,
   });
+});
+
+test('checkout event metadata preserves paid-offer experiment attribution', () => {
+  const metadata = getCheckoutEventMetadata({
+    id: 'cs_test_offer_experiment',
+    customer: 'cus_test',
+    customer_details: null,
+    customer_email: 'designer@example.com',
+    metadata: {
+      offer_experiment_id: 'project_pass_primary_v1',
+      offer_experiment_variant: 'project_pass_first',
+      primary_offer: 'large_export',
+    },
+    subscription: null,
+  }, 'stripe_webhook');
+
+  assert.equal(metadata.offer_experiment_id, 'project_pass_primary_v1');
+  assert.equal(metadata.offer_experiment_variant, 'project_pass_first');
+  assert.equal(metadata.primary_offer, 'large_export');
+});
+
+test('checkout confirmation builds temporary Pro access for large flow pass', () => {
+  const before = Date.now();
+  const update = getCheckoutSubscriptionUpdate({
+    id: 'cs_test_456',
+    customer: 'cus_456',
+    customer_details: null,
+    customer_email: 'buyer@example.com',
+    metadata: {
+      offer_type: 'large_flow_pass',
+      access_days: '7',
+    },
+    subscription: null,
+  } as any);
+
+  assert.equal(update.tier, 'pro');
+  assert.equal(update.status, 'active');
+  assert.equal(update.stripeCustomerId, 'cus_456');
+  assert.equal(update.stripeSubscriptionId, undefined);
+  assert.ok(update.currentPeriodEnd);
+
+  const periodEnd = new Date(update.currentPeriodEnd!).getTime();
+  const accessMs = 7 * 24 * 60 * 60 * 1000;
+  assert.ok(periodEnd >= before + accessMs - 1000);
+  assert.ok(periodEnd <= Date.now() + accessMs + 1000);
 });
