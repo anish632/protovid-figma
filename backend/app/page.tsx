@@ -2,25 +2,59 @@ import type { Metadata } from 'next';
 import MarketingLanding from './MarketingLanding';
 
 export const metadata: Metadata = {
-  title: 'Figma Prototype Review Walkthroughs — ProtoVid',
-  description: 'Turn a connected Figma prototype flow into an MP4 walkthrough, share one browser review link, and collect timestamped feedback and approval.',
+  metadataBase: new URL('https://protovid.dasgroupllc.com'),
+  title: 'Figma Prototype to Product Demo Video — ProtoVid',
+  description: 'Turn a connected Figma prototype flow into a polished MP4, WebM, or GIF product demo. No screen recording, no editing timeline. Free to start, Pro from $5/mo.',
+  keywords: [
+    'Figma prototype to video',
+    'export Figma prototype to MP4',
+    'Figma prototype to product demo video',
+    'Figma prototype to GIF',
+    'Figma prototype to WebM',
+    'Figma demo video plugin',
+    'prototype walkthrough video',
+    'Figma prototype review tool',
+    'export Figma prototype',
+    'product demo video maker',
+  ],
+  applicationName: 'ProtoVid',
+  authors: [{ name: 'Das Group', url: 'https://dasgroupllc.com' }],
+  creator: 'Das Group',
+  publisher: 'Das Group',
+  category: 'DesignApplication',
   alternates: {
     canonical: 'https://protovid.dasgroupllc.com/',
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   openGraph: {
-    title: 'Review Figma Prototype Flows Without Screen Recording — ProtoVid',
-    description: 'Export a connected flow, send one browser link, and collect timestamped feedback and approval.',
+    title: 'Figma Prototype to Product Demo Video — ProtoVid',
+    description: 'Export a clean product demo from a connected Figma prototype flow without screen recording or video editing. MP4, WebM, and GIF output with optional review rooms.',
     url: 'https://protovid.dasgroupllc.com/',
+    siteName: 'ProtoVid',
     type: 'website',
+    locale: 'en_US',
     images: [{
       url: 'https://protovid.dasgroupllc.com/logo128x128.png',
+      width: 128,
+      height: 128,
       alt: 'ProtoVid logo',
     }],
   },
   twitter: {
     card: 'summary',
-    title: 'Figma Prototype Review Walkthroughs — ProtoVid',
-    description: 'Export a connected flow, send one browser link, and collect timestamped feedback and approval.',
+    title: 'Figma Prototype to Product Demo Video — ProtoVid',
+    description: 'Export a clean product demo from a connected Figma prototype flow without screen recording or video editing.',
+    images: ['https://protovid.dasgroupllc.com/logo128x128.png'],
   },
 };
 

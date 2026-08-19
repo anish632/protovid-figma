@@ -1,31 +1,61 @@
 {
-  "product": "ProtoVid",
-  "category": "design-tools",
+  "product": "ProtoVid - Figma Prototype Video Exporter",
+  "category": "design-tool-plugin",
   "primary_platform": "figma",
-  "best_for": ["prototype videos", "client demos", "stakeholder presentations", "app previews"],
-  "not_for": ["static screenshots", "frame-by-frame animation", "video editing"],
-  "reads": ["figma prototype connections", "figma frames", "interaction graphs"],
-  "writes": ["mp4 video files", "client-ready demos"],
+  "best_for": [
+    "Client prototype presentations",
+    "Stakeholder demo videos",
+    "App Store and product preview videos",
+    "SaaS landing-page demos",
+    "Design handoff documentation",
+    "Shareable review rooms with timestamped feedback and approval"
+  ],
+  "not_for": [
+    "Static design exports",
+    "Interactive prototyping",
+    "Screen recording",
+    "General video editing"
+  ],
+  "reads": [
+    "Figma prototype connections",
+    "Frame interaction graphs",
+    "Flow starting points"
+  ],
+  "writes": [
+    "MP4 video files (H.264)",
+    "WebM video files",
+    "GIF files",
+    "Browser review rooms with decision brief, timestamped comments, and approval status"
+  ],
   "requires_auth": false,
-  "pricing": "$5/month for Pro, 3 free watermarked exports monthly",
-  "first_successful_action": "Export prototype flow as MP4 video",
-  "trust_boundary": "Figma plugin with backend video processing",
-  "docs_url": "See README for current implementation details",
+  "pricing": "Free: 3 watermarked 720p exports/month. Project Pass: $4 once for 7 days of unlimited 1080p/4K, no watermark, no subscription. Pro: $5/mo unlimited 1080p/4K, no watermark, review rooms and owner analytics.",
+  "first_successful_action": "Install from Figma Community → Open plugin on prototype page → Choose format and quality → Click Export → Download video",
+  "trust_boundary": "Plugin runs in Figma sandbox. Frames are encoded locally when supported; MP4 fallback transcoding uploads the fallback payload to the backend encoding endpoint.",
+  "docs_url": "https://github.com/protovid/protovid-figma/blob/main/README.md",
+  "install_url": "https://www.figma.com/community/plugin/1606994616321079154",
   "pricing_url": "https://protovid.dasgroupllc.com/pricing",
-  "last_verified": "2026-06-06",
-  "version": "1.0.0",
+  "privacy_url": "https://protovid.dasgroupllc.com/#privacy",
+  "llms_url": "https://protovid.dasgroupllc.com/llms.txt",
+  "support_url": "mailto:support@protovid.app",
+  "status_url": "https://protovid.dasgroupllc.com/api/health",
+  "last_verified": "2026-08-18",
+  "version": "1.3.15",
   "claim_policy": {
     "allowed_claims": [
-      "Converts Figma prototype flows to MP4 videos",
-      "Free tier: 3 watermarked 720p exports per month",
-      "Pro tier: $5/month for unlimited HD/4K exports",
-      "No watermark on Pro exports",
-      "Supports 720p, 1080p, and 4K resolution"
+      "Exports connected Figma prototype flows to MP4, WebM, and GIF",
+      "Supports 720p, 1080p, and 4K resolutions",
+      "Free tier includes 3 watermarked 720p exports per month",
+      "Project Pass is $4 once for 7 days of unlimited 1080p/4K with no watermark",
+      "Pro subscription is $5/month",
+      "Removes watermark for paid users",
+      "Offers browser review rooms with timestamped comments and approval status",
+      "Generates review briefs on-platform without a separate AI account"
     ],
     "disallowed_claims": [
-      "Install counts or marketplace metrics",
-      "User testimonials without verification",
-      "Performance benchmarks without testing"
+      "Revenue numbers",
+      "Install counts",
+      "Performance benchmarks",
+      "User ratings or review scores"
     ]
   }
 }

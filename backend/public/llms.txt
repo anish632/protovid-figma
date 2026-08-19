@@ -1,0 +1,50 @@
+# ProtoVid
+
+> ProtoVid is a Figma plugin that turns connected prototype flows into polished product demo videos (MP4, WebM, GIF) plus optional shareable review rooms with timestamped feedback, decision briefs, and approval status. No screen recording and no editing timeline.
+
+ProtoVid is published by Das Group. It runs inside Figma, reads the prototype connections you already built, and exports the connected path as a downloadable video. It is not a screen recorder, a general video editor, or an interactive prototyping tool.
+
+## Key facts
+
+- Platform: Figma Community plugin (runs in the Figma sandbox).
+- Output formats: MP4, WebM, GIF (H.264 for MP4).
+- Resolutions: 720p on Free; 1080p and 4K on Project Pass and Pro.
+- Watermark: present on Free exports; removed on Project Pass and Pro.
+- Review rooms: browser-based links with a generated decision brief, timestamped comments, and approval / change-request status. No separate AI account required.
+- Install: https://www.figma.com/community/plugin/1606994616321079154
+- First successful action: Install from Figma Community, open the plugin on a page with a connected prototype flow, choose format and quality, export, and download the video.
+
+## Pricing
+
+- Free: $0 — 3 watermarked 720p exports per month.
+- Project Pass: $4 once — 7 days of unlimited 1080p and 4K exports, no watermark, no subscription.
+- Pro: $5/month — unlimited 1080p and 4K exports, no watermark, review rooms, briefs, and owner analytics.
+
+## Best for
+
+- App Store and product preview videos
+- SaaS landing-page demos
+- Client walkthroughs and design reviews
+- Portfolio case studies
+- Social reels and launch posts
+- Investor and stakeholder updates
+
+## Not for
+
+- Screen recording
+- General video editing
+- Interactive prototyping (ProtoVid reads existing prototypes; it does not build them)
+
+## Privacy
+
+- Scoped to the connected flow on the current Figma page; unrelated files are not scanned.
+- Frames are encoded locally in the plugin when supported; MP4 fallback transcoding sends the fallback payload to ProtoVid's encoding endpoint.
+- Review links expire (Free 7 days, paid 30 days); expired review videos, comments, and owner links are physically deleted by a daily retention cleanup.
+
+## Links
+
+- Home: https://protovid.dasgroupllc.com/
+- Pricing: https://protovid.dasgroupllc.com/pricing
+- Install (Figma Community): https://www.figma.com/community/plugin/1606994616321079154
+- Agent manifest: https://protovid.dasgroupllc.com/.well-known/agent.json
+- Support: support@protovid.app
