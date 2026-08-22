@@ -2,10 +2,11 @@
 // Primary: WebCodecs API (VideoEncoder) + mp4-muxer -> H.264 MP4 (no server needed)
 // Fallback: pure-JS MJPEG AVI, then backend FFmpeg transcode to MP4
 
-import { Muxer, ArrayBufferTarget, type MuxerOptions } from 'mp4-muxer';
+import { Muxer as MP4Muxer, ArrayBufferTarget as MP4ArrayBufferTarget, type MuxerOptions as MP4MuxerOptions } from 'mp4-muxer';
+import { Muxer as WebMMuxer, ArrayBufferTarget as WebMArrayBufferTarget, type MuxerOptions as WebMMuxerOptions } from 'webm-muxer';
 import { BACKEND_MAX_UPLOAD_BYTES, getPayloadPreflight } from './exportPreflight';
 
-const PLUGIN_VERSION = '1.3.14';
+const PLUGIN_VERSION = '1.3.15';
 
 // Screen-level transition metadata captured from prototype reactions. Drives the
 // synthesized "transition effects" (fade/slide) between frames and the
@@ -64,7 +65,7 @@ interface FrameInput {
 }
 
 interface EncodeSettings {
-  format: 'mp4';
+  format: 'mp4' | 'webm' | 'gif';
 }
 
 type ProgressCallback = (percent: number) => void;
@@ -105,6 +106,7 @@ const FPS = 30;
 // there), so a low frame rate keeps the uploaded AVI tiny without changing what
 // the viewer sees. Each still is repeated FALLBACK_FPS * holdSeconds times.
 const FALLBACK_FPS = 1;
+const GIF_FPS = 8;
 // Vercel serverless functions reject request bodies larger than ~4.5MB, so the
 // AVI we upload for transcoding must stay under this. Fail fast (with a
 // categorized error) instead of burning a doomed multi-second upload.
@@ -148,6 +150,10 @@ const H264_CODEC_CANDIDATES = [
   'avc1.42001f', // Older baseline variant already used by the app
   'avc1.640028', // High profile fallback for browsers that prefer it
 ] as const;
+const WEBM_CODEC_CANDIDATES = [
+  { configCodec: 'vp09.00.10.08', muxerCodec: 'V_VP9' },
+  { configCodec: 'vp8', muxerCodec: 'V_VP8' },
+] as const;
 
 function pickWebCodecsBitrate(width: number, height: number): number {
   const pixels = width * height;
@@ -180,6 +186,34 @@ async function pickSupportedH264Config(width: number, height: number): Promise<V
   }
 
   throw new Error('No supported H.264 WebCodecs configuration found');
+}
+
+async function pickSupportedWebMConfig(width: number, height: number): Promise<{
+  config: VideoEncoderConfig;
+  muxerCodec: string;
+}> {
+  const baseConfig = {
+    width,
+    height,
+    bitrate: pickWebCodecsBitrate(width, height),
+    framerate: FPS,
+  };
+
+  for (const candidate of WEBM_CODEC_CANDIDATES) {
+    const config = { codec: candidate.configCodec, ...baseConfig };
+    try {
+      if (typeof VideoEncoder.isConfigSupported === 'function') {
+        const supported = await VideoEncoder.isConfigSupported(config);
+        if (supported?.supported) return { config, muxerCodec: candidate.muxerCodec };
+      } else {
+        return { config, muxerCodec: candidate.muxerCodec };
+      }
+    } catch (_error) {
+      // Try the next codec candidate.
+    }
+  }
+
+  throw new Error('No supported WebM WebCodecs configuration found');
 }
 
 async function loadPNG(data: Uint8Array): Promise<ImageBitmap> {
@@ -581,8 +615,8 @@ async function encodeMP4WebCodecs(
   const { width, height } = padDimensions(targetDimensions.width, targetDimensions.height);
   const supportedConfig = await pickSupportedH264Config(width, height);
 
-  const target = new ArrayBufferTarget();
-  const muxerOptions: MuxerOptions<ArrayBufferTarget> & {
+  const target = new MP4ArrayBufferTarget();
+  const muxerOptions: MP4MuxerOptions<MP4ArrayBufferTarget> & {
     metadata: Record<string, string>;
   } = {
     target,
@@ -595,7 +629,7 @@ async function encodeMP4WebCodecs(
       comment: 'Professional prototype videos for client presentations'
     }
   };
-  const muxer = new Muxer(muxerOptions);
+  const muxer = new MP4Muxer(muxerOptions);
 
   let encodeError: Error | null = null;
   const encoder = new VideoEncoder({
@@ -617,6 +651,93 @@ async function encodeMP4WebCodecs(
 
     // Backpressure: let the encoder drain before queuing more frames so long
     // flows don't build an unbounded VideoFrame backlog and run out of memory.
+    while (encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
+      await sleep(4);
+      if (encodeError) throw encodeError;
+    }
+
+    let snapshot: ImageBitmap | HTMLCanvasElement;
+    try {
+      snapshot = await createImageBitmap(cnv);
+    } catch (_e) {
+      snapshot = cnv;
+    }
+
+    for (let r = 0; r < repeat; r++) {
+      const videoFrame = new VideoFrame(snapshot, {
+        timestamp: Math.round(frameIndex * usPerFrame),
+        duration: Math.round(usPerFrame),
+      });
+      encoder.encode(videoFrame, { keyFrame: frameIndex % keyframeInterval === 0 });
+      videoFrame.close();
+      frameIndex++;
+    }
+
+    if (snapshot !== cnv && typeof (snapshot as ImageBitmap).close === 'function') {
+      (snapshot as ImageBitmap).close();
+    }
+  };
+
+  await renderTimeline(
+    frames,
+    ctx,
+    canvas,
+    width,
+    height,
+    targetDimensions.width,
+    targetDimensions.height,
+    addWatermark,
+    onProgress,
+    emit,
+    options
+  );
+
+  await encoder.flush();
+  if (encodeError) throw encodeError;
+  muxer.finalize();
+
+  return { data: new Uint8Array(target.buffer), width, height };
+}
+
+async function encodeWebMWebCodecs(
+  frames: FrameInput[],
+  onProgress: ProgressCallback,
+  addWatermark: boolean,
+  options: EncodeOptions = {}
+): Promise<{ data: Uint8Array; width: number; height: number }> {
+  const firstDimensions = await getFirstFrameDimensions(frames);
+  const targetDimensions = fitDimensions(
+    firstDimensions.width,
+    firstDimensions.height,
+    options.maxWidth,
+    options.maxHeight
+  );
+  const { width, height } = padDimensions(targetDimensions.width, targetDimensions.height);
+  const supported = await pickSupportedWebMConfig(width, height);
+
+  const target = new WebMArrayBufferTarget();
+  const muxerOptions: WebMMuxerOptions<WebMArrayBufferTarget> = {
+    target,
+    video: { codec: supported.muxerCodec, width, height, frameRate: FPS },
+    firstTimestampBehavior: 'strict',
+  };
+  const muxer = new WebMMuxer(muxerOptions);
+
+  let encodeError: Error | null = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => { encodeError = e; },
+  });
+
+  encoder.configure(supported.config);
+
+  const { canvas, ctx } = createCanvas(width, height);
+  let frameIndex = 0;
+  const usPerFrame = 1_000_000 / FPS;
+  const keyframeInterval = FPS * 2;
+
+  const emit = async (cnv: HTMLCanvasElement, repeat: number) => {
+    if (encodeError) throw encodeError;
     while (encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
       await sleep(4);
       if (encodeError) throw encodeError;
@@ -784,6 +905,169 @@ async function encodeAVIFallback(
     width,
     height,
   };
+}
+
+function pushString(out: number[], value: string) {
+  for (let i = 0; i < value.length; i++) out.push(value.charCodeAt(i) & 0xff);
+}
+
+function pushU16(out: number[], value: number) {
+  out.push(value & 0xff, (value >> 8) & 0xff);
+}
+
+function writeGifSubBlocks(out: number[], bytes: number[]) {
+  for (let i = 0; i < bytes.length; i += 255) {
+    const block = bytes.slice(i, i + 255);
+    out.push(block.length, ...block);
+  }
+  out.push(0);
+}
+
+function encodeGifLzw(indices: Uint8Array, minCodeSize: number): number[] {
+  const clearCode = 1 << minCodeSize;
+  const endCode = clearCode + 1;
+  const output: number[] = [];
+  let dictionary = new Map<string, number>();
+  let codeSize = minCodeSize + 1;
+  let nextCode = endCode + 1;
+  let bitBuffer = 0;
+  let bitCount = 0;
+
+  const resetDictionary = () => {
+    dictionary = new Map<string, number>();
+    for (let i = 0; i < clearCode; i++) dictionary.set(String(i), i);
+    codeSize = minCodeSize + 1;
+    nextCode = endCode + 1;
+  };
+
+  const writeCode = (code: number) => {
+    bitBuffer |= code << bitCount;
+    bitCount += codeSize;
+    while (bitCount >= 8) {
+      output.push(bitBuffer & 0xff);
+      bitBuffer >>= 8;
+      bitCount -= 8;
+    }
+  };
+
+  resetDictionary();
+  writeCode(clearCode);
+  let prefix = String(indices[0]);
+  for (let i = 1; i < indices.length; i++) {
+    const current = String(indices[i]);
+    const combo = `${prefix},${current}`;
+    if (dictionary.has(combo)) {
+      prefix = combo;
+      continue;
+    }
+
+    writeCode(dictionary.get(prefix) ?? Number(prefix));
+
+    if (nextCode < 4096) {
+      dictionary.set(combo, nextCode++);
+      if (nextCode === (1 << codeSize) && codeSize < 12) codeSize++;
+    } else {
+      writeCode(clearCode);
+      resetDictionary();
+    }
+
+    prefix = current;
+  }
+  writeCode(dictionary.get(prefix) ?? Number(prefix));
+  writeCode(endCode);
+
+  if (bitCount > 0) output.push(bitBuffer & 0xff);
+  return output;
+}
+
+function canvasToGifIndices(canvas: HTMLCanvasElement, width: number, height: number): Uint8Array {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to read GIF frame');
+  const data = ctx.getImageData(0, 0, width, height).data;
+  const indices = new Uint8Array(width * height);
+  for (let source = 0, target = 0; source < data.length; source += 4, target++) {
+    const r = data[source] >> 6;
+    const g = data[source + 1] >> 6;
+    const b = data[source + 2] >> 6;
+    indices[target] = (r << 4) | (g << 2) | b;
+  }
+  return indices;
+}
+
+function buildGif(frames: Uint8Array[], width: number, height: number, delayCs: number): Uint8Array {
+  const out: number[] = [];
+  pushString(out, 'GIF89a');
+  pushU16(out, width);
+  pushU16(out, height);
+  out.push(0xf5, 0, 0);
+
+  for (let r = 0; r < 4; r++) {
+    for (let g = 0; g < 4; g++) {
+      for (let b = 0; b < 4; b++) {
+        out.push(r * 85, g * 85, b * 85);
+      }
+    }
+  }
+
+  pushString(out, '!\xff\x0bNETSCAPE2.0\x03\x01');
+  pushU16(out, 0);
+  out.push(0);
+
+  for (const frame of frames) {
+    out.push(0x21, 0xf9, 0x04, 0x04);
+    pushU16(out, delayCs);
+    out.push(0, 0);
+    out.push(0x2c);
+    pushU16(out, 0);
+    pushU16(out, 0);
+    pushU16(out, width);
+    pushU16(out, height);
+    out.push(0);
+    out.push(6);
+    writeGifSubBlocks(out, encodeGifLzw(frame, 6));
+  }
+
+  out.push(0x3b);
+  return new Uint8Array(out);
+}
+
+async function encodeGIF(
+  frames: FrameInput[],
+  onProgress: ProgressCallback,
+  addWatermark: boolean,
+  options: EncodeOptions = {}
+): Promise<{ data: Uint8Array; width: number; height: number }> {
+  const firstDimensions = await getFirstFrameDimensions(frames);
+  const maxWidth = Math.min(options.maxWidth ?? 720, 720);
+  const maxHeight = Math.min(options.maxHeight ?? 720, 720);
+  const targetDimensions = fitDimensions(firstDimensions.width, firstDimensions.height, maxWidth, maxHeight);
+  const { width, height } = targetDimensions;
+  const { canvas, ctx } = createCanvas(width, height);
+  const gifFrames: Uint8Array[] = [];
+  const fps = options.fps ?? GIF_FPS;
+
+  const emit = async (cnv: HTMLCanvasElement, repeat: number) => {
+    const indices = canvasToGifIndices(cnv, width, height);
+    const compactRepeat = Math.max(1, Math.ceil(repeat / Math.max(1, Math.round(FPS / fps))));
+    for (let r = 0; r < compactRepeat; r++) gifFrames.push(indices);
+  };
+
+  await renderTimeline(
+    frames,
+    ctx,
+    canvas,
+    width,
+    height,
+    targetDimensions.width,
+    targetDimensions.height,
+    addWatermark,
+    onProgress,
+    emit,
+    { ...options, fps }
+  );
+
+  const delayCs = Math.max(2, Math.round(100 / fps));
+  return { data: buildGif(gifFrames, width, height, delayCs), width, height };
 }
 
 async function transcodeAVIToMP4(
@@ -1010,6 +1294,49 @@ export async function encodeVideo(
         ...options,
       }
     : options;
+
+  if (settings.format === 'gif') {
+    const gif = await encodeGIF(frames, onProgress, addWatermark, {
+      ...effectiveOptions,
+      disableTransitions: effectiveOptions.disableTransitions,
+      maxWidth: Math.min(effectiveOptions.maxWidth ?? 720, 720),
+      maxHeight: Math.min(effectiveOptions.maxHeight ?? 720, 720),
+      fps: Math.min(effectiveOptions.fps ?? GIF_FPS, GIF_FPS),
+    });
+    const blob = new Blob([gif.data as unknown as BlobPart], { type: 'image/gif' });
+    onProgress(100);
+    return {
+      url: URL.createObjectURL(blob),
+      filename: `protovid-export-${stamp}.gif`,
+      width: gif.width,
+      height: gif.height,
+      deliveryProfile: effectiveOptions.maxWidth || effectiveOptions.maxHeight ? 'fallback' : 'requested',
+      fileSizeBytes: blob.size,
+      payloadBytes: null,
+      uploadDurationMs: null,
+      transcodeDurationMs: null,
+    };
+  }
+
+  if (settings.format === 'webm') {
+    if (typeof VideoEncoder === 'undefined') {
+      throw new Error('WebM export requires WebCodecs support in this browser');
+    }
+    const webm = await encodeWebMWebCodecs(frames, onProgress, addWatermark, effectiveOptions);
+    const blob = new Blob([webm.data as unknown as BlobPart], { type: 'video/webm' });
+    onProgress(100);
+    return {
+      url: URL.createObjectURL(blob),
+      filename: `protovid-export-${stamp}.webm`,
+      width: webm.width,
+      height: webm.height,
+      deliveryProfile: effectiveOptions.maxWidth || effectiveOptions.maxHeight ? 'fallback' : 'requested',
+      fileSizeBytes: blob.size,
+      payloadBytes: null,
+      uploadDurationMs: null,
+      transcodeDurationMs: null,
+    };
+  }
 
   // 1. Try WebCodecs H.264 MP4 first (best compatibility)
   if (!effectiveOptions.forceBackend && typeof VideoEncoder !== 'undefined') {

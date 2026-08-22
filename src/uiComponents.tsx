@@ -1,6 +1,7 @@
 import { ComponentChildren, h } from 'preact';
 import { useState } from 'preact/hooks';
 import type {
+  ExportFormat,
   ExportProgressModel,
   PrimaryActionModel,
   Resolution,
@@ -70,6 +71,9 @@ interface AppHeaderProps {
   voiceTranscript: string;
   voiceError: string | null;
   onVoiceToggle: () => void;
+  showUpgradePlan?: boolean;
+  upgradePlanDisabled?: boolean;
+  onUpgradePlan?: () => void;
 }
 
 export interface VoiceControlProps {
@@ -107,18 +111,39 @@ export function VoiceControl({ status, transcript, error, onToggle }: VoiceContr
   );
 }
 
-export function AppHeader({ onClose, voiceStatus, voiceTranscript, voiceError, onVoiceToggle }: AppHeaderProps) {
+export function AppHeader({
+  onClose,
+  voiceStatus,
+  voiceTranscript,
+  voiceError,
+  onVoiceToggle,
+  showUpgradePlan = false,
+  upgradePlanDisabled = false,
+  onUpgradePlan,
+}: AppHeaderProps) {
   return (
     <header class="app-header">
       <div class="brand-lockup">
         <img class="app-icon" src="__PROTOVID_ICON__" alt="" />
         <div class="brand-copy">
           <strong>ProtoVid</strong>
-          <span>Export to MP4</span>
+          <span>Export video</span>
         </div>
       </div>
       <div class="header-actions">
-        <VoiceControl status={voiceStatus} transcript={voiceTranscript} error={voiceError} onToggle={onVoiceToggle} />
+        {showUpgradePlan && onUpgradePlan ? (
+          <button
+            class="header-upgrade-button"
+            type="button"
+            onClick={onUpgradePlan}
+            disabled={upgradePlanDisabled}
+          >
+            Upgrade plan
+          </button>
+        ) : null}
+        {voiceStatus !== 'unsupported' ? (
+          <VoiceControl status={voiceStatus} transcript={voiceTranscript} error={voiceError} onToggle={onVoiceToggle} />
+        ) : null}
         <button class="icon-button" type="button" onClick={onClose} aria-label="Close ProtoVid">
           <Icon name="close" size={18} />
         </button>
@@ -279,19 +304,41 @@ export function ResolutionSelector({ options, value, onChange }: ResolutionSelec
   );
 }
 
-export function FormatSelector() {
+interface FormatSelectorProps {
+  value: ExportFormat;
+  onChange: (value: ExportFormat) => void;
+}
+
+const FORMAT_OPTIONS: Array<{
+  value: ExportFormat;
+  label: string;
+  helper: string;
+}> = [
+  { value: 'mp4', label: 'MP4', helper: 'Best compatibility' },
+  { value: 'webm', label: 'WebM', helper: 'Smaller web clips' },
+  { value: 'gif', label: 'GIF', helper: 'Looping embeds' },
+];
+
+export function FormatSelector({ value, onChange }: FormatSelectorProps) {
   return (
-    <div class="format-control">
-      <div class="format-selected" aria-label="Selected format MP4">
-        <span class="format-icon">MP4</span>
-        <div><strong>MP4 video</strong><span>Selected format</span></div>
-        <Icon name="check" size={16} />
+    <fieldset class="format-control">
+      <legend>Format</legend>
+      <div class="format-options" role="radiogroup" aria-label="Export format">
+        {FORMAT_OPTIONS.map(option => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            class={value === option.value ? 'format-option selected' : 'format-option'}
+            onClick={() => onChange(option.value)}
+            title={option.helper}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.helper}</span>
+          </button>
+        ))}
       </div>
-      <details class="inline-disclosure">
-        <summary>More formats <Icon name="chevron" size={14} /></summary>
-        <p>GIF and WebM are being considered. MP4 is the only available format today.</p>
-      </details>
-    </div>
+    </fieldset>
   );
 }
 
@@ -312,8 +359,78 @@ export function TrustRow() {
         <span>Frames are sent only when you export. ProtoVid does not access unrelated files.</span>
         <span class="learn-more">Learn more</span>
       </summary>
-      <p>Only the ordered frames in your selected path are prepared for the MP4. Unrelated pages and files remain untouched.</p>
+      <p>Only the ordered frames in your selected path are prepared for export. Unrelated pages and files remain untouched.</p>
     </details>
+  );
+}
+
+interface UpgradeChoicePanelProps {
+  frameCount: number;
+  estimatedDuration: string;
+  selectedResolution: Resolution;
+  projectPassAvailable: boolean;
+  projectPassLabel: string;
+  monthlyLabel: string;
+  projectPassFirst: boolean;
+  onProjectPass: () => void;
+  onMonthly: () => void;
+}
+
+export function UpgradeChoicePanel({
+  frameCount,
+  estimatedDuration,
+  selectedResolution,
+  projectPassAvailable,
+  projectPassLabel,
+  monthlyLabel,
+  projectPassFirst,
+  onProjectPass,
+  onMonthly,
+}: UpgradeChoicePanelProps) {
+  const primaryIsProjectPass = projectPassAvailable && projectPassFirst;
+  const primaryLabel = primaryIsProjectPass
+    ? `Export clean HD/4K - ${projectPassLabel}`
+    : `Unlock clean HD/4K - ${monthlyLabel}`;
+  const secondaryLabel = primaryIsProjectPass
+    ? `Use recurring Pro - ${monthlyLabel}`
+    : projectPassAvailable
+      ? `Finish this project - ${projectPassLabel}`
+      : '';
+
+  return (
+    <section class="upgrade-choice-panel" aria-labelledby="upgrade-choice-heading">
+      <div class="upgrade-choice-copy">
+        <p class="section-eyebrow">Ready to deliver</p>
+        <h2 id="upgrade-choice-heading">Make this walkthrough client-ready</h2>
+        <p>{frameCount} connected {frameCount === 1 ? 'frame' : 'frames'} · {estimatedDuration} · remove the watermark and export in HD/4K.</p>
+      </div>
+      <div class="value-strip" aria-label="Upgrade benefits">
+        <span><Icon name="check" size={14} />No watermark</span>
+        <span><Icon name="check" size={14} />1080p and 4K</span>
+        <span><Icon name="check" size={14} />Client handoff</span>
+      </div>
+      <button
+        class="upgrade-cta"
+        type="button"
+        onClick={primaryIsProjectPass ? onProjectPass : onMonthly}
+      >
+        {primaryLabel}
+      </button>
+      {secondaryLabel && (
+        <button
+          class="secondary-button upgrade-secondary-cta"
+          type="button"
+          onClick={primaryIsProjectPass ? onMonthly : onProjectPass}
+        >
+          {secondaryLabel}
+        </button>
+      )}
+      <p class="stripe-note">
+        {primaryIsProjectPass
+          ? `Project Pass is one-time access for this deadline. Pro is for recurring ${selectedResolution} client work.`
+          : 'Pro is for recurring client work. Project Pass is available for one deadline.'}
+      </p>
+    </section>
   );
 }
 
@@ -344,15 +461,16 @@ interface ProgressStepsProps {
   elapsed: string;
   frameCount: number;
   resolution: Resolution;
+  formatLabel: string;
   detail: string;
 }
 
-export function ProgressSteps({ model, elapsed, frameCount, resolution, detail }: ProgressStepsProps) {
+export function ProgressSteps({ model, elapsed, frameCount, resolution, formatLabel, detail }: ProgressStepsProps) {
   return (
     <main class="state-screen progress-screen" aria-labelledby="progress-heading">
       <div class="state-icon state-icon-progress"><span /></div>
       <p class="state-eyebrow">3 · Export</p>
-      <h1 id="progress-heading">Creating your MP4</h1>
+      <h1 id="progress-heading">Creating your {formatLabel}</h1>
       <p class="state-description" role="status" aria-live="polite">
         {model.currentStage.label}. {detail}
       </p>
@@ -378,18 +496,19 @@ export interface FileSummaryData {
   duration: string;
   frameCount: number;
   resolution: string;
+  formatLabel: string;
   watermark: string;
   fileSize?: string | null;
 }
 
 export function FileSummary({ data }: { data: FileSummaryData }) {
   return (
-    <section class="file-summary" aria-label="MP4 file details">
+    <section class="file-summary" aria-label={`${data.formatLabel} file details`}>
       <div class="file-identity">
         <span class="file-icon"><span /></span>
         <div>
           <strong title={data.filename}>{data.filename}</strong>
-          <span>MP4 video</span>
+          <span>{data.formatLabel} export</span>
         </div>
       </div>
       <dl class="file-facts">
@@ -560,10 +679,11 @@ export function EmptyState({ onRefresh, onClose, onOpenGuide }: EmptyStateProps)
       <div class="empty-preview" aria-hidden="true"><span /><i /><span /></div>
       <p class="state-eyebrow">1 · Detect</p>
       <h1 id="empty-heading">No connected prototype flow found</h1>
-      <p class="state-description">Connect two or more frames in the Prototype panel, then refresh ProtoVid to create a shareable walkthrough.</p>
+      <p class="state-description">ProtoVid exports the connected path from a Figma prototype. Add at least one Prototype interaction, then refresh.</p>
       <ol class="empty-instructions">
-        <li>Select a starting frame in Figma.</li>
-        <li>Connect it to the next frame in the Prototype panel.</li>
+        <li>Select the frame where the walkthrough should start.</li>
+        <li>Open the Prototype tab and drag the node to the next frame.</li>
+        <li>Repeat for each screen you want in the exported path.</li>
       </ol>
       <button class="primary-action" type="button" onClick={onRefresh}><Icon name="refresh" size={16} />Refresh flow</button>
       <button class="secondary-button" type="button" onClick={onOpenGuide}>See a 20-second example</button>
@@ -621,24 +741,47 @@ interface SuccessActionsProps {
   onCopy: () => void;
   onShare: () => void;
   shareState: 'idle' | 'creating' | 'ready' | 'error';
+  reviewShareAvailable: boolean;
 }
 
-export function SuccessActions({ downloadUrl, filename, onDownload, onAnother, onCopy, onShare, shareState }: SuccessActionsProps) {
+export function SuccessActions({ downloadUrl, filename, onDownload, onAnother, onCopy, onShare, shareState, reviewShareAvailable }: SuccessActionsProps) {
   const actions = getSuccessActions(Boolean(downloadUrl));
   const shareAction = actions.find(action => action.id === 'share')!;
   const downloadAction = actions.find(action => action.id === 'download')!;
   const anotherAction = actions.find(action => action.id === 'another')!;
   const copyAction = actions.find(action => action.id === 'copy')!;
+  const shareLabel = shareState === 'creating'
+    ? 'Creating review link…'
+    : shareState === 'ready'
+      ? 'Copy review link'
+      : shareAction.label;
+
+  if (reviewShareAvailable) {
+    return (
+      <div class="success-actions">
+        <button class="primary-action success-share-action" type="button" onClick={onShare} disabled={!shareAction.enabled || shareState === 'creating'}>
+          <Icon name="share" size={17} />
+          {shareLabel}
+        </button>
+        <a class="secondary-button success-download-action full-width" href={downloadUrl} download={filename} onClick={onDownload} aria-disabled={!downloadAction.enabled}><Icon name="download" size={15} />{downloadAction.label}</a>
+        <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another flow</button>
+        <div class="secondary-action-row">
+          <button class="text-button" type="button" onClick={onCopy}><Icon name="copy" size={14} />{copyAction.label}</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div class="success-actions">
       <a class="primary-action success-download-action" href={downloadUrl} download={filename} onClick={onDownload} aria-disabled={!downloadAction.enabled}><Icon name="download" size={17} />{downloadAction.label}</a>
+      <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another flow</button>
       <div class="secondary-action-row">
         <button class="secondary-button" type="button" onClick={onShare} disabled={!shareAction.enabled || shareState === 'creating'}>
           <Icon name="share" size={15} />
-          {shareState === 'creating' ? 'Creating review link…' : shareState === 'ready' ? 'Copy review link' : shareAction.label}
+          {shareLabel}
         </button>
-        <button class="secondary-button" type="button" onClick={onAnother}><Icon name="repeat" size={15} />{anotherAction.label}</button>
-        <button class="secondary-button" type="button" onClick={onCopy}><Icon name="copy" size={15} />{copyAction.label}</button>
+        <button class="text-button" type="button" onClick={onCopy}><Icon name="copy" size={14} />{copyAction.label}</button>
       </div>
     </div>
   );
@@ -670,7 +813,7 @@ export function ShareInvitePanel({
           <span class="share-invite-icon"><Icon name="share" size={15} /></span>
           <div>
             <h2 id="share-invite-heading">Invite reviewers</h2>
-            <p>Send this decision room with the MP4, review brief, timestamped feedback, and approval.</p>
+            <p>Send this decision room with the export, review brief, timestamped feedback, and approval.</p>
           </div>
         </div>
         <div class="share-link-row">

@@ -93,7 +93,7 @@ test('Free users can select a Pro resolution and receive an upgrade explanation'
     resolution: '1080p',
     canExport: false,
     requiresUpgrade: true,
-    message: '1080p is available with Pro for a clean, client-ready MP4.',
+    message: '1080p is available with Pro for a clean, client-ready export.',
   });
 });
 
@@ -123,16 +123,16 @@ test('primary action uses the requested Free and Pro copy', () => {
     resolution: '4K',
     remainingExports: 0,
   }), {
-    label: 'Export client-ready MP4',
+    label: 'Export client-ready video',
     supportingText: '4K without a watermark',
     intent: 'export',
     disabled: false,
   });
 });
 
-test('successful export keeps MP4 download as the primary action', () => {
+test('successful export keeps file download as the primary action', () => {
   assert.deepEqual(getSuccessActions(true).slice(0, 2), [
-    { id: 'download', label: 'Download MP4', priority: 'primary', enabled: true },
+    { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
     { id: 'share', label: 'Create client review link', priority: 'secondary', enabled: true },
   ]);
 });
@@ -182,7 +182,7 @@ test('loading, exporting, and missing-flow actions communicate the next state', 
     resolution: '1080p',
     remainingExports: 0,
     isExporting: true,
-  }).label, 'Creating MP4…');
+  }).label, 'Creating export…');
 
   const refresh = getPrimaryActionModel({
     plan: 'free',
@@ -211,13 +211,25 @@ test('export summary reflects plan, watermark, and optional estimates', () => {
     plan: 'free',
     resolution: '4K',
   }), 'MP4 · 4K · Pro required · No watermark');
+
+  assert.equal(getExportSummaryCopy({
+    plan: 'pro',
+    resolution: '1080p',
+    format: 'webm',
+  }), 'WEBM · 1080p · Client-ready · No watermark');
+
+  assert.equal(getExportSummaryCopy({
+    plan: 'free',
+    resolution: '720p',
+    format: 'gif',
+  }), 'GIF · 720p · Free proof · Watermark included');
 });
 
 test('progress maps boundaries and out-of-range values across four named stages', () => {
   assert.deepEqual(EXPORT_PROGRESS_STAGES.map(stage => stage.label), [
     'Preparing frames',
     'Rendering transitions',
-    'Encoding MP4',
+    'Encoding file',
     'Finalizing download',
   ]);
   assert.equal(getProgressStage(-10).id, 'preparing');
@@ -328,9 +340,9 @@ test('unknown diagnostics are mapped to safe copy without exposing backend detai
   assert.equal(model.secondaryAction, 'Review flow');
 });
 
-test('success-state actions make MP4 download primary while keeping review sharing available', () => {
+test('success-state actions make file download primary while keeping review sharing available', () => {
   assert.deepEqual(getSuccessActions(true), [
-    { id: 'download', label: 'Download MP4', priority: 'primary', enabled: true },
+    { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
     { id: 'share', label: 'Create client review link', priority: 'secondary', enabled: true },
     { id: 'another', label: 'Export another', priority: 'secondary', enabled: true },
     { id: 'copy', label: 'Copy export details', priority: 'secondary', enabled: true },

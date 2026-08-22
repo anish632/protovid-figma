@@ -175,8 +175,8 @@ function shell(content) {
 function thumbnail(iconData) {
   return shell(`
     ${logo(iconData)}
-    ${tspans(['Export Figma', 'prototypes as', 'MP4 videos'], 120, 350, 78, 82)}
-    ${tspans(['Turn connected flows into client-ready MP4s', 'for reviews, decks, docs, and handoff.'], 120, 620, 34, 46, 700, '#cbd5e1')}
+    ${tspans(['Turn Figma', 'prototypes into', 'demo videos'], 120, 350, 78, 82)}
+    ${tspans(['Create clean product demos for launches,', 'clients, portfolios, and social posts.'], 120, 620, 34, 46, 700, '#cbd5e1')}
     ${pill(120, 750, 'Auto-detect flows')}
     ${pill(366, 750, 'MP4 output', '#1f2937')}
     ${pill(555, 750, 'No screen recording', '#1f2937')}
@@ -206,8 +206,8 @@ function slideDetect(iconData) {
 function slideSuccess(iconData) {
   return shell(`
     ${logo(iconData)}
-    ${tspans(['Export a shareable', 'MP4 walkthrough'], 120, 360, 76, 82)}
-    ${tspans(['Skip screen recording.', 'Download a clean walkthrough file.'], 120, 560, 34, 46, 700, '#cbd5e1')}
+    ${tspans(['Export a polished', 'MP4 product demo'], 120, 360, 76, 82)}
+    ${tspans(['Skip screen recording.', 'Download a clean demo video.'], 120, 560, 34, 46, 700, '#cbd5e1')}
     ${pill(120, 705, 'Download MP4')}
     ${pill(354, 705, 'Review-ready', '#1f2937')}
     ${pill(583, 705, 'No editing timeline', '#1f2937')}
@@ -236,7 +236,7 @@ function slidePro(iconData) {
   return shell(`
     ${logo(iconData)}
     ${tspans(['Remove the watermark', 'and export in HD'], 120, 360, 74, 80)}
-    ${tspans(['No watermark, HD/4K, and unlimited repeat exports.', 'Built for client iteration.'], 120, 560, 34, 46, 700, '#cbd5e1')}
+    ${tspans(['No watermark, HD/4K, and unlimited repeat exports.', 'Built for client-ready demos.'], 120, 560, 34, 46, 700, '#cbd5e1')}
     ${pill(120, 705, 'No watermark')}
     ${pill(342, 705, '1080p / 4K', '#1f2937')}
     ${pill(568, 705, 'Unlimited exports', '#1f2937')}

@@ -19,7 +19,7 @@ import { buildExportEventId } from './exportAnalytics';
 
 interface ProtoVidExportSettings {
   resolution: '720p' | '1080p' | '4K';
-  format: 'mp4';
+  format: 'mp4' | 'webm' | 'gif';
   showCursor: boolean;
   licenseKey?: string;
   frameCount?: number;
@@ -46,6 +46,7 @@ interface PendingCheckout {
   plan: 'monthly' | 'large_export';
   sessionId?: string;
   createdAt: string;
+  checkoutConfigVersion?: number;
 }
 
 interface BillingManagementCapability {
@@ -142,9 +143,11 @@ let currentSettings: ProtoVidExportSettings = {
   showCursor: true
 };
 
-const PLUGIN_VERSION = '1.3.14';
+const PLUGIN_VERSION = '1.3.16';
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
 const SETUP_GUIDE_URL = `${BACKEND_URL}/#how-it-works`;
+const CHECKOUT_SESSION_CONFIG_VERSION = 2;
+const EXPORT_FORMATS = ['mp4', 'webm', 'gif'] as const;
 // These are diagnostics and enumeration safeguards, not export limits. A
 // selected long path remains exportable; the UI can use the preflight message
 // to suggest splitting it or choosing 720p before a costly encode fails.
@@ -206,7 +209,7 @@ async function loadSavedExportPreferences(): Promise<SavedExportPreferences | nu
     if (
       !preferences.settings ||
       !['720p', '1080p', '4K'].includes(preferences.settings.resolution) ||
-      preferences.settings.format !== 'mp4' ||
+      !EXPORT_FORMATS.includes(preferences.settings.format as ProtoVidExportSettings['format']) ||
       typeof preferences.settings.showCursor !== 'boolean' ||
       typeof preferences.lastSuccessfulExportAt !== 'string' ||
       typeof preferences.lastSuccessfulExportId !== 'string'
@@ -214,7 +217,7 @@ async function loadSavedExportPreferences(): Promise<SavedExportPreferences | nu
     return {
       settings: {
         resolution: preferences.settings.resolution as ProtoVidExportSettings['resolution'],
-        format: 'mp4',
+        format: preferences.settings.format as ProtoVidExportSettings['format'],
         showCursor: preferences.settings.showCursor,
       },
       selectedPathId: typeof preferences.selectedPathId === 'string' ? preferences.selectedPathId : undefined,
@@ -305,6 +308,10 @@ async function loadPendingCheckout(): Promise<PendingCheckout | null> {
     if (!value || typeof value !== 'object') return null;
     const checkout = value as PendingCheckout;
     if (!checkout.email || !checkout.url || !checkout.createdAt) return null;
+    if (checkout.checkoutConfigVersion !== CHECKOUT_SESSION_CONFIG_VERSION) {
+      await figma.clientStorage.deleteAsync('pendingCheckout');
+      return null;
+    }
     const ageMs = Date.now() - new Date(checkout.createdAt).getTime();
     if (!Number.isFinite(ageMs) || ageMs > 24 * 60 * 60 * 1000) {
       await figma.clientStorage.deleteAsync('pendingCheckout');
@@ -418,12 +425,12 @@ async function trackEvent(eventType: string, metadata?: AnalyticsMetadata) {
   analyticsQueue = analyticsQueue.then(async () => {
     try {
       const [anon, email] = await Promise.all([loadAnonymousId(), loadEmail()]);
-      const safeMetadata = Object.fromEntries(
-        Object.entries({ ...enrichedMetadata, anonymousId: anon }).filter((entry): entry is [string, string | number | boolean | null] => {
-          const value = entry[1];
-          return value === null || ['string', 'number', 'boolean'].includes(typeof value);
-        })
-      );
+      const safeMetadata: Record<string, string | number | boolean | null> = {};
+      for (const [key, value] of Object.entries({ ...enrichedMetadata, anonymousId: anon })) {
+        if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+          safeMetadata[key] = value;
+        }
+      }
       // The plugin UI is already the proven network surface for pricing and
       // entitlement calls. Deliver analytics through it as well: recent Figma
       // builds completed exports while main-sandbox /api/track calls vanished.
@@ -1025,7 +1032,7 @@ async function handleExportVideo(settings: ProtoVidExportSettings) {
           entitlement,
           trialExpired: false,
           daysSinceFirstExport,
-          message: 'Free exports used this month. Upgrade to keep exporting MP4s today.'
+          message: 'Free exports used this month. Upgrade to keep exporting videos today.'
         }
       });
       finishWithoutEncoding();
@@ -1164,33 +1171,47 @@ async function handleOpenCheckout(email: string, plan?: string, pricingMetadata:
     if (response.ok) {
       const data = await response.json();
       if (data.url) {
+        const sessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
         await savePendingCheckout({
           email: normalizedEmail,
           url: data.url,
           plan: selectedPlan,
-          sessionId: typeof data.sessionId === 'string' ? data.sessionId : undefined,
+          sessionId,
           createdAt: new Date().toISOString(),
+          checkoutConfigVersion: CHECKOUT_SESSION_CONFIG_VERSION,
         });
-        trackEvent('checkout_opened', {
+        const checkoutMetadata = {
           plan: selectedPlan,
           pricingVariant: data.pricingVariant || pricingMetadata.pricingVariant,
           priceLabel: data.priceLabel || pricingMetadata.priceLabel,
           amountCents: data.amountCents || pricingMetadata.amountCents,
+          stripe_checkout_session_id: sessionId || null,
           offerType: data.offerType || null,
           source: pricingMetadata.source || null,
           offer_experiment_id: pricingMetadata.offerExperimentId || null,
           offer_experiment_variant: pricingMetadata.offerExperimentVariant || null,
           primary_offer: pricingMetadata.primaryOffer || null,
           frameCount: pricingMetadata.frameCount || null
-        });
-        figma.openExternal(data.url);
+        };
+        trackEvent('checkout_open_attempted', checkoutMetadata);
+        try {
+          figma.openExternal(data.url);
+          trackEvent('checkout_opened', checkoutMetadata);
+        } catch (error) {
+          trackEvent('checkout_open_failed', {
+            ...checkoutMetadata,
+            reason: error instanceof Error ? error.message.slice(0, 120) : 'open_external_failed',
+          });
+          throw error;
+        }
         figma.notify('Opening checkout... We\'ll detect your payment automatically.');
         figma.ui.postMessage({
           type: 'checkout-opened',
           data: {
             email: normalizedEmail,
             url: data.url,
-            plan: selectedPlan
+            plan: selectedPlan,
+            sessionId,
           }
         });
       } else {
@@ -1256,8 +1277,14 @@ async function handleResumeCheckout(url?: string, email?: string, plan?: string)
   trackEvent('checkout_recovered', {
     plan: plan || pending?.plan || 'monthly',
     email: email || pending?.email || null,
+    stripe_checkout_session_id: pending?.sessionId || null,
   });
   figma.openExternal(checkoutUrl);
+  trackEvent('checkout_opened', {
+    plan: plan || pending?.plan || 'monthly',
+    source: 'resume_checkout',
+    stripe_checkout_session_id: pending?.sessionId || null,
+  });
   figma.notify('Reopening checkout. ProtoVid will keep checking payment status.');
 }
 
@@ -1415,9 +1442,9 @@ async function handleEncodingComplete(
   // `export_completed` event remains the source of truth going forward.
   trackEvent('export_success', exportMetadata);
   trackEvent('export_succeeded', exportMetadata);
-  if (!isPremium && (currentEntitlement?.freeExportsUsed ?? 0) >= 2) {
+  if (!isPremium && (currentEntitlement?.freeExportsUsed ?? 0) >= 1) {
     trackEvent('review_prompt_shown', {
-      trigger: 'second_success_or_later',
+      trigger: 'success_or_later',
       ...exportMetadata,
     });
   }

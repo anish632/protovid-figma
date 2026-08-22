@@ -1,4 +1,5 @@
 export const RESOLUTIONS = ['720p', '1080p', '4K'] as const;
+export const EXPORT_FORMATS = ['mp4', 'webm', 'gif'] as const;
 
 export interface PathRecommendationCandidate {
   id: string;
@@ -21,6 +22,7 @@ export function getRecommendedPathId(paths: PathRecommendationCandidate[]): stri
 }
 
 export type Resolution = (typeof RESOLUTIONS)[number];
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 export type PlanTier = 'free' | 'pro';
 
 export type ShareExperimentVariant = 'control' | 'invite_panel';
@@ -172,7 +174,7 @@ export function getResolutionSelection(
     canExport: !requiresUpgrade,
     requiresUpgrade,
     message: requiresUpgrade
-      ? `${resolution} is available with Pro for a clean, client-ready MP4.`
+      ? `${resolution} is available with Pro for a clean, client-ready export.`
       : null,
   };
 }
@@ -224,7 +226,7 @@ export function getPrimaryActionModel({
 }: PrimaryActionInput): PrimaryActionModel {
   if (isExporting) {
     return {
-      label: 'Creating MP4…',
+      label: 'Creating export…',
       supportingText: 'Your flow and settings are locked for this export.',
       intent: 'wait',
       disabled: true,
@@ -279,7 +281,7 @@ export function getPrimaryActionModel({
 
   if (plan === 'pro') {
     return {
-      label: hasPreviousExport ? 'Export updated version' : 'Export client-ready MP4',
+      label: hasPreviousExport ? 'Export updated version' : 'Export client-ready video',
       supportingText: hasPreviousExport ? 'Reuse your saved flow and settings' : `${resolution} without a watermark`,
       intent: 'export',
       disabled: false,
@@ -297,6 +299,7 @@ export function getPrimaryActionModel({
 export interface ExportSummaryInput {
   plan: PlanTier;
   resolution: Resolution;
+  format?: ExportFormat;
   estimatedDuration?: string | null;
   estimatedSize?: string | null;
 }
@@ -304,15 +307,17 @@ export interface ExportSummaryInput {
 export function getExportSummaryCopy({
   plan,
   resolution,
+  format = 'mp4',
   estimatedDuration,
   estimatedSize,
 }: ExportSummaryInput): string {
+  const formatLabel = format.toUpperCase();
   const requiresUpgrade = getResolutionSelection(resolution, plan).requiresUpgrade;
   const summary = requiresUpgrade
-    ? ['MP4', resolution, 'Pro required', 'No watermark']
+    ? [formatLabel, resolution, 'Pro required', 'No watermark']
     : plan === 'pro'
-      ? ['MP4', resolution, 'Client-ready', 'No watermark']
-      : ['MP4', '720p', 'Free proof', 'Watermark included'];
+      ? [formatLabel, resolution, 'Client-ready', 'No watermark']
+      : [formatLabel, '720p', 'Free proof', 'Watermark included'];
 
   if (estimatedDuration) summary.push(estimatedDuration);
   if (estimatedSize) summary.push(estimatedSize);
@@ -320,7 +325,7 @@ export function getExportSummaryCopy({
 }
 
 export const SUCCESS_ACTIONS = [
-  { id: 'download', label: 'Download MP4', priority: 'primary' },
+  { id: 'download', label: 'Download file', priority: 'primary' },
   { id: 'share', label: 'Create client review link', priority: 'secondary' },
   { id: 'another', label: 'Export another', priority: 'secondary' },
   { id: 'copy', label: 'Copy export details', priority: 'secondary' },
@@ -363,7 +368,7 @@ export function getRestoreResultModel(result: RestoreResult): {
 export const EXPORT_PROGRESS_STAGES = [
   { id: 'preparing', label: 'Preparing frames', startsAt: 0 },
   { id: 'rendering', label: 'Rendering transitions', startsAt: 25 },
-  { id: 'encoding', label: 'Encoding MP4', startsAt: 60 },
+  { id: 'encoding', label: 'Encoding file', startsAt: 60 },
   { id: 'finalizing', label: 'Finalizing download', startsAt: 90 },
 ] as const;
 

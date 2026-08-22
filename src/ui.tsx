@@ -19,6 +19,7 @@ import {
   finishExportRequest,
   parseVoiceCommand,
   requestExport,
+  ExportFormat,
   Resolution,
   VoiceCommand,
 } from './uiModel';
@@ -41,6 +42,7 @@ import {
   SuccessActions,
   TrustRow,
   UpgradeCard,
+  UpgradeChoicePanel,
   PostSuccessEmailSave,
   ReviewPrompt,
 } from './uiComponents';
@@ -88,11 +90,12 @@ interface AppState {
   pendingCheckoutUrl: string;
   pendingCheckoutEmail: string;
   pendingCheckoutPlan: 'monthly' | 'large_export' | '';
+  pendingCheckoutSessionId: string;
   trialExpired: boolean;
   daysSinceFirstExport: number | null;
   settings: {
     resolution: '720p' | '1080p' | '4K';
-    format: 'mp4';
+    format: ExportFormat;
     showCursor: boolean;
   };
   progress: {
@@ -121,7 +124,7 @@ interface AppState {
 interface SavedExportInfo {
   settings: {
     resolution: Resolution;
-    format: 'mp4';
+    format: ExportFormat;
     showCursor: boolean;
   };
   selectedPathId?: string;
@@ -161,7 +164,7 @@ interface FlowAnalysis {
 }
 
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
-const PLUGIN_VERSION = '1.3.14';
+const PLUGIN_VERSION = '1.3.16';
 type UpgradeSource = 'upsell_card' | 'free_limit_paywall' | 'large_flow_pass';
 type CheckoutPlan = 'monthly' | 'large_export';
 
@@ -213,8 +216,27 @@ interface VoiceRecognition {
 
 type VoiceRecognitionConstructor = new () => VoiceRecognition;
 
+function getVoiceRecognitionConstructor(): VoiceRecognitionConstructor | null {
+  if (window.isSecureContext === false) return null;
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: VoiceRecognitionConstructor;
+    webkitSpeechRecognition?: VoiceRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural;
+}
+
+function getFormatLabel(format: ExportFormat): string {
+  return format.toUpperCase();
+}
+
+function getFormatMime(format: ExportFormat): string {
+  if (format === 'webm') return 'video/webm';
+  if (format === 'gif') return 'image/gif';
+  return 'video/mp4';
 }
 
 function formatAccessEnd(value?: string | null): string | null {
@@ -298,6 +320,7 @@ function App() {
     pendingCheckoutUrl: '',
     pendingCheckoutEmail: '',
     pendingCheckoutPlan: '',
+    pendingCheckoutSessionId: '',
     trialExpired: false,
     daysSinceFirstExport: null,
     settings: {
@@ -333,7 +356,9 @@ function App() {
   const [emailIntent, setEmailIntent] = useState<'checkout' | 'restore' | 'switch' | 'save'>('checkout');
   const [showPostSuccessEmailSave, setShowPostSuccessEmailSave] = useState(false);
   const [reviewFeedback, setReviewFeedback] = useState<'unasked' | 'helpful' | 'dismissed'>('unasked');
-  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>(() =>
+    getVoiceRecognitionConstructor() ? 'idle' : 'unsupported'
+  );
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
@@ -352,6 +377,11 @@ function App() {
   const postExportUpsellTrackedRef = useRef<string | null>(null);
   const postSuccessEmailPromptTrackedRef = useRef(false);
   const postSuccessEmailDismissedRef = useRef(false);
+  // Users who never get a prototype detected re-refresh several times (median 6
+  // failures per stuck user in production). Escalate once per session so we
+  // stop leaving them looping in the empty state.
+  const consecutiveFlowFailuresRef = useRef(0);
+  const stuckGuideAutoOpenedRef = useRef(false);
   const pricingEmailRef = useRef('');
   const upgradeSourceRef = useRef<UpgradeSource>('upsell_card');
   const upgradePlanRef = useRef<CheckoutPlan>('monthly');
@@ -479,6 +509,7 @@ function App() {
             pendingCheckoutUrl: msg.data.pendingCheckout?.url || '',
             pendingCheckoutEmail: msg.data.pendingCheckout?.email || '',
             pendingCheckoutPlan: msg.data.pendingCheckout?.plan || '',
+            pendingCheckoutSessionId: msg.data.pendingCheckout?.sessionId || '',
             checkoutState: msg.data.pendingCheckout?.email ? 'pending' : prev.checkoutState,
             trialExpired: msg.data.trialExpired || false,
             daysSinceFirstExport: msg.data.daysSinceFirstExport || null,
@@ -490,6 +521,11 @@ function App() {
             frameCount: msg.data.frameCount || 0,
             reason: msg.data.hasPrototype ? 'connected_path' : 'no_connected_path',
           });
+          if (msg.data.hasPrototype) {
+            consecutiveFlowFailuresRef.current = 0;
+          } else {
+            handleFlowDetectionFailure('initial');
+          }
           if (msg.data.hasPrototype && msg.data.pathSelectionRequired === true && msg.data.defaultPathId) {
             trackUiEvent('prototype_path_auto_selected', {
               source: 'recommended_default',
@@ -567,6 +603,11 @@ function App() {
             frameCount: scannedFrameCount,
             reason: scannedFrameCount > 0 ? 'connected_path' : 'no_connected_path',
           });
+          if (scannedFrameCount > 0) {
+            consecutiveFlowFailuresRef.current = 0;
+          } else {
+            handleFlowDetectionFailure('refresh');
+          }
           if (scannedFrameCount > 0 && msg.data.pathSelectionRequired === true && msg.data.defaultPathId) {
             trackUiEvent('prototype_path_auto_selected', {
               source: 'recommended_default',
@@ -969,6 +1010,7 @@ function App() {
             pendingCheckoutUrl: msg.data.entitlement?.isPaid || msg.data.isValid ? '' : prev.pendingCheckoutUrl,
             pendingCheckoutEmail: msg.data.entitlement?.isPaid || msg.data.isValid ? '' : prev.pendingCheckoutEmail,
             pendingCheckoutPlan: msg.data.entitlement?.isPaid || msg.data.isValid ? '' : prev.pendingCheckoutPlan,
+            pendingCheckoutSessionId: msg.data.entitlement?.isPaid || msg.data.isValid ? '' : prev.pendingCheckoutSessionId,
             checkoutState: msg.data.entitlement?.isPaid || msg.data.isValid ? 'success' : prev.checkoutState
           }));
           break;
@@ -980,6 +1022,7 @@ function App() {
             pendingCheckoutUrl: msg.data.url || prev.pendingCheckoutUrl,
             pendingCheckoutEmail: msg.data.email || prev.pendingCheckoutEmail,
             pendingCheckoutPlan: msg.data.plan || prev.pendingCheckoutPlan,
+            pendingCheckoutSessionId: msg.data.sessionId || prev.pendingCheckoutSessionId,
             paymentCheckAvailable: true,
             checkoutState: 'pending'
           }));
@@ -1140,7 +1183,7 @@ function App() {
     window.setTimeout(() => {
       const link = document.createElement('a');
       link.href = state.videoUrl!;
-      link.download = state.downloadFilename || 'protovid-export.mp4';
+      link.download = state.downloadFilename || `protovid-export.${state.settings.format}`;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
@@ -1201,7 +1244,11 @@ function App() {
   }, [state.stage, state.isPremium, state.videoUrl, state.activeExportFrameCount, state.activeExportAttemptId, state.frameCount, state.entitlement, state.pricingVariant, state.monthlyPriceLabel, state.monthlyAmountCents, state.offerExperimentId, state.offerExperimentVariant, state.primaryOffer]);
 
   useEffect(() => {
-    const hasMeaningfulEmailMoment = (state.entitlement?.freeExportsUsed ?? 0) >= 2;
+    // Most free users export only once, so gating the email prompt at 2+
+    // exports meant it almost never appeared. Ask after any successful export
+    // (the user has already gotten value); a dismiss ref still prevents
+    // repeated nagging within the same session.
+    const hasMeaningfulEmailMoment = (state.entitlement?.freeExportsUsed ?? 0) >= 1;
     if (state.stage !== 'complete' || state.isPremium || state.userEmail.trim().includes('@') || !hasMeaningfulEmailMoment) {
       if (state.stage !== 'complete') {
         setShowPostSuccessEmailSave(false);
@@ -1280,6 +1327,7 @@ function App() {
               pendingCheckoutUrl: '',
               pendingCheckoutEmail: '',
               pendingCheckoutPlan: '',
+              pendingCheckoutSessionId: '',
               checkoutState: 'success',
               notice: 'Pro is active. Client-ready resolutions are now available.'
             }));
@@ -1437,6 +1485,7 @@ function App() {
     exportRequestGateRef.current = requestDecision.gate;
     trackUiEvent('export_clicked', {
       resolution: state.settings.resolution,
+      format: state.settings.format,
       isPremium: state.isPremium,
       remainingExports: state.entitlement.freeExportsRemaining,
       frameCount: selectedPathFrameCount,
@@ -1572,7 +1621,8 @@ function App() {
         data: {
           url: state.pendingCheckoutUrl,
           email: state.pendingCheckoutEmail || state.userEmail,
-          plan: state.pendingCheckoutPlan || 'monthly'
+          plan: state.pendingCheckoutPlan || 'monthly',
+          sessionId: state.pendingCheckoutSessionId || undefined
         }
       }
     }, '*');
@@ -1603,6 +1653,18 @@ function App() {
 
   const handleOpenSetupGuide = () => {
     parent.postMessage({ pluginMessage: { type: 'open-setup-guide' } }, '*');
+  };
+
+  const handleFlowDetectionFailure = (source: 'initial' | 'refresh') => {
+    consecutiveFlowFailuresRef.current += 1;
+    if (consecutiveFlowFailuresRef.current >= 2 && !stuckGuideAutoOpenedRef.current) {
+      stuckGuideAutoOpenedRef.current = true;
+      trackUiEvent('flow_detection_stuck', {
+        source,
+        failureCount: consecutiveFlowFailuresRef.current,
+      });
+      handleOpenSetupGuide();
+    }
   };
 
   const handleOpenSubscriptionManagement = () => {
@@ -1662,6 +1724,25 @@ function App() {
     }));
   };
 
+  const handleFormatChange = (format: ExportFormat) => {
+    trackUiEvent('format_interest', {
+      format,
+      source: 'format_selector',
+      isPremium: state.isPremium,
+    });
+    trackUiEvent('export_settings_changed', {
+      setting: 'format',
+      value: format,
+      isPremium: state.isPremium,
+    });
+    setState(prev => ({
+      ...prev,
+      settings: { ...prev.settings, format },
+      error: null,
+      notice: null,
+    }));
+  };
+
   const handlePathChange = (pathId: string) => {
     const path = state.prototypePaths.find(candidate => candidate.id === pathId);
     if (!path) return;
@@ -1708,7 +1789,10 @@ function App() {
     state.primaryOffer,
     showLargeFlowPassOffer,
   );
-  const shouldShowReview = !state.isPremium && (state.entitlement?.freeExportsUsed ?? 0) >= 2;
+  // Most free users only export once, so the prior `>= 2` gate meant almost no
+  // one saw the review prompt. Ask after the first successful export — the
+  // review prompt is only rendered on the success screen anyway.
+  const shouldShowReview = !state.isPremium && (state.entitlement?.freeExportsUsed ?? 0) >= 1;
   const isOneTimeAccess = state.entitlement?.billingAccessKind === 'one_time_access';
   const accessEndLabel = formatAccessEnd(state.entitlement?.currentPeriodEnd);
 
@@ -1723,6 +1807,7 @@ function App() {
   const summaryCopy = getExportSummaryCopy({
     plan,
     resolution: state.settings.resolution,
+    format: state.settings.format,
     estimatedDuration,
   });
   const basePrimaryAction = getPrimaryActionModel({
@@ -1757,7 +1842,7 @@ function App() {
         : baseErrorModel
     : null;
   const hasBlockingFlowError = errorModel?.code === 'invalid-flow' || errorModel?.code === 'unsupported-content';
-  const primaryAction = hasBlockingFlowError
+  const primaryActionBase = hasBlockingFlowError
     ? {
         label: 'Review flow',
         supportingText: 'Refresh after checking the affected connections or frame.',
@@ -1772,6 +1857,22 @@ function App() {
           disabled: false,
         }
       : basePrimaryAction;
+  const conversionPrimaryPlan: CheckoutPlan = primaryActionBase.intent === 'upgrade' && freeUsed && showLargeFlowPassOffer
+    ? 'large_export'
+    : experimentPrimaryPlan;
+  const primaryAction = primaryActionBase.intent === 'upgrade' && conversionPrimaryPlan === 'large_export'
+    ? {
+        ...primaryActionBase,
+        label: 'Export clean HD/4K',
+        supportingText: `${LARGE_FLOW_PASS_DISPLAY} once for this project.`,
+      }
+    : primaryActionBase.intent === 'upgrade'
+      ? {
+          ...primaryActionBase,
+          label: 'Unlock clean HD/4K',
+          supportingText: `${PRO_PRICE_MONTHLY_DISPLAY} for recurring client-ready exports.`,
+        }
+      : primaryActionBase;
   const selectedStartName = selectedPath?.startNodeName || null;
   const selectedEndName = selectedPath?.endNodeName || null;
   const resolutionLabel = state.outputWidth && state.outputHeight
@@ -1785,6 +1886,7 @@ function App() {
   const elapsedLabel = elapsedSeconds < 60
     ? `${elapsedSeconds}s`
     : `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`;
+  const selectedFormatLabel = getFormatLabel(state.settings.format);
   const progressDetail = state.progress.stage.toLowerCase().includes('retrying')
     ? 'Using a safer compatibility profile. Your original settings are preserved.'
     : progressModel.currentStage.id === 'preparing'
@@ -1792,7 +1894,7 @@ function App() {
       : progressModel.currentStage.id === 'rendering'
         ? 'Applying supported transitions between frames.'
         : progressModel.currentStage.id === 'encoding'
-          ? 'Packaging the walkthrough as an MP4.'
+          ? `Packaging the walkthrough as ${selectedFormatLabel}.`
           : 'Preparing your file for download.';
 
   const openPathChooser = () => {
@@ -1810,8 +1912,8 @@ function App() {
     if (primaryAction.intent === 'export') handleExport();
     if (primaryAction.intent === 'upgrade') {
       handleOpenCheckout(
-        experimentPrimaryPlan === 'large_export' ? 'large_flow_pass' : freeUsed ? 'free_limit_paywall' : 'upsell_card',
-        experimentPrimaryPlan,
+        conversionPrimaryPlan === 'large_export' ? 'large_flow_pass' : freeUsed ? 'free_limit_paywall' : 'upsell_card',
+        conversionPrimaryPlan,
       );
     }
     if (primaryAction.intent === 'choose-path') openPathChooser();
@@ -1874,7 +1976,7 @@ function App() {
   };
 
   const exportDetails = [
-    state.downloadFilename || 'ProtoVid export.mp4',
+    state.downloadFilename || `ProtoVid export.${state.settings.format}`,
     `Approx. ${estimatedDurationSeconds} sec`,
     `${completedExportFrameCount} ${pluralize(completedExportFrameCount, 'frame')}`,
     resolutionLabel,
@@ -1900,7 +2002,7 @@ function App() {
       }
       setState(prev => ({ ...prev, notice: 'Export details copied.' }));
     } catch (_error) {
-      setState(prev => ({ ...prev, notice: 'Could not copy automatically. Your MP4 is still ready to download.' }));
+      setState(prev => ({ ...prev, notice: `Could not copy automatically. Your ${selectedFormatLabel} is still ready to download.` }));
     }
   };
 
@@ -1919,6 +2021,10 @@ function App() {
 
   const handleCreateShareLink = async () => {
     if (!state.videoUrl || state.shareState === 'creating') return;
+    if (state.settings.format !== 'mp4') {
+      setState(prev => ({ ...prev, notice: 'Client review links currently support MP4 exports. Download this file or switch to MP4 to share a review room.' }));
+      return;
+    }
     const experimentVariant = getShareExperimentVariant(state.anonymousId);
 
     trackUiEvent('share_clicked', {
@@ -1954,15 +2060,15 @@ function App() {
 
     try {
       const videoResponse = await fetch(state.videoUrl);
-      if (!videoResponse.ok) throw new Error('The exported MP4 is no longer available.');
+      if (!videoResponse.ok) throw new Error('The exported file is no longer available.');
       const video = await videoResponse.blob();
       const response = await fetch(`${BACKEND_URL}/api/shares`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'video/mp4',
+          'Content-Type': getFormatMime(state.settings.format),
           'x-user-email': state.userEmail.trim(),
           ...(state.anonymousId ? { 'x-anonymous-id': state.anonymousId } : {}),
-          'x-filename': state.downloadFilename || 'protovid-export.mp4',
+          'x-filename': state.downloadFilename || `protovid-export.${state.settings.format}`,
           'x-resolution': state.settings.resolution,
           'x-frame-count': String(state.activeExportFrameCount || state.frameCount),
           ...(selectedStartName ? { 'x-start-frame-name': selectedStartName } : {}),
@@ -1985,7 +2091,7 @@ function App() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create a share link.';
-      setState(prev => ({ ...prev, shareState: 'error', notice: `${message} Your MP4 is still ready to download.` }));
+      setState(prev => ({ ...prev, shareState: 'error', notice: `${message} Your ${selectedFormatLabel} is still ready to download.` }));
       trackUiEvent('share_link_failed', { source: 'success_screen', reason: message.slice(0, 120) });
     }
   };
@@ -2056,7 +2162,7 @@ function App() {
       case 'download': {
         const downloadLink = document.querySelector('.success-actions a[download]') as HTMLAnchorElement | null;
         if (!downloadLink || state.stage !== 'complete') {
-          setState(prev => ({ ...prev, notice: 'Finish an export first, then say “download MP4”.' }));
+          setState(prev => ({ ...prev, notice: 'Finish an export first, then say “download video”.' }));
           return;
         }
         handleDownloadClick();
@@ -2097,7 +2203,7 @@ function App() {
       case 'help':
         setState(prev => ({
           ...prev,
-          notice: 'Try “refresh flow”, “set resolution to 1080p”, “export video”, “download MP4”, or “share it”.',
+          notice: 'Try “refresh flow”, “set resolution to 1080p”, “export video”, “download video”, or “share it”.',
         }));
         return;
     }
@@ -2125,11 +2231,7 @@ function App() {
       return;
     }
 
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: VoiceRecognitionConstructor;
-      webkitSpeechRecognition?: VoiceRecognitionConstructor;
-    };
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    const Recognition = getVoiceRecognitionConstructor();
     if (!Recognition) {
       setVoiceStatus('unsupported');
       setVoiceError('Voice controls are not available in this Figma environment.');
@@ -2298,6 +2400,9 @@ function App() {
         voiceTranscript={voiceTranscript}
         voiceError={voiceError}
         onVoiceToggle={startVoiceListening}
+        showUpgradePlan={!state.isPremium}
+        upgradePlanDisabled={state.checkoutState === 'opening'}
+        onUpgradePlan={() => handleOpenCheckout('upsell_card', 'monthly')}
       />
 
       {state.stage === 'loading' && (
@@ -2419,20 +2524,33 @@ function App() {
                   value={state.settings.resolution}
                   onChange={handleResolutionChange}
                 />
-                <FormatSelector />
+                <FormatSelector
+                  value={state.settings.format}
+                  onChange={handleFormatChange}
+                />
                 <ExportSummary summary={summaryCopy} />
                 <TrustRow />
               </SectionCard>
 
               {freeUsed && (
-                <InlineNotice tone="warning">Your free allowance is used for this month. Upgrade to keep exporting now.</InlineNotice>
+                <UpgradeChoicePanel
+                  frameCount={selectedPathFrameCount}
+                  estimatedDuration={estimatedDuration}
+                  selectedResolution={state.settings.resolution}
+                  projectPassAvailable={showLargeFlowPassOffer}
+                  projectPassLabel={LARGE_FLOW_PASS_DISPLAY}
+                  monthlyLabel={PRO_PRICE_MONTHLY_DISPLAY}
+                  projectPassFirst={freeUsed && showLargeFlowPassOffer ? true : experimentPrimaryPlan === 'large_export'}
+                  onProjectPass={() => handleOpenCheckout('free_limit_paywall', 'large_export')}
+                  onMonthly={() => handleOpenCheckout('free_limit_paywall', 'monthly')}
+                />
               )}
 
               {emailCapturePanel && <SectionCard title="Account">{emailCapturePanel}</SectionCard>}
 
               {state.paymentCheckAvailable && state.userEmail && (
                 <section class="checkout-recovery" aria-label="Pending checkout">
-                  <div><strong>Checkout pending</strong><span>Your flow and setup are saved.</span></div>
+                  <div><strong>Finish checkout when ready</strong><span>Your flow, resolution, and path are saved.</span></div>
                   <div class="recovery-actions">
                     <button type="button" class="secondary-button" onClick={handleResumeCheckout}>Resume checkout</button>
                     <button type="button" class="text-button" onClick={handleManualPaymentCheck}>Check payment</button>
@@ -2454,6 +2572,7 @@ function App() {
             elapsed={elapsedLabel}
             frameCount={state.activeExportFrameCount || selectedPathFrameCount}
             resolution={state.settings.resolution}
+            formatLabel={selectedFormatLabel}
             detail={progressDetail}
           />
         </div>
@@ -2466,7 +2585,7 @@ function App() {
               <span class="notice-icon notice-icon-success"><Icon name="check" size={19} /></span>
               <div>
                 <p class="state-eyebrow">4 · Download</p>
-                <h1 id="success-heading">Your MP4 is ready</h1>
+                <h1 id="success-heading">Your {selectedFormatLabel} is ready</h1>
               </div>
             </div>
             {state.downloadStarted && <InlineNotice tone="success">Your download has started.</InlineNotice>}
@@ -2476,23 +2595,25 @@ function App() {
               </InlineNotice>
             )}
             <FileSummary data={{
-              filename: state.downloadFilename || 'protovid-export.mp4',
+              filename: state.downloadFilename || `protovid-export.${state.settings.format}`,
               duration: `≈ ${estimatedDurationSeconds} sec`,
               frameCount: completedExportFrameCount,
               resolution: resolutionLabel,
+              formatLabel: selectedFormatLabel,
               watermark: state.isPremium ? 'None' : 'Included',
               fileSize: fileSizeLabel,
             }} />
             <SuccessActions
               downloadUrl={state.videoUrl}
-              filename={state.downloadFilename || 'protovid-export.mp4'}
+              filename={state.downloadFilename || `protovid-export.${state.settings.format}`}
               onDownload={handleDownloadClick}
               onAnother={resetForAnotherExport}
               onCopy={handleCopyExportDetails}
               onShare={handleCreateShareLink}
               shareState={state.shareState}
+              reviewShareAvailable={state.settings.format === 'mp4'}
             />
-            {state.shareUrl && getShareExperimentVariant(state.anonymousId) === 'invite_panel' && (
+            {state.shareUrl && (
               <ShareInvitePanel
                 shareUrl={state.shareUrl}
                 onCopyLink={handleCopyReviewLink}
@@ -2513,6 +2634,14 @@ function App() {
                   : 'Delivered with a safer compatibility profile. Your selected quality remains unchanged for the next export.'}
               </InlineNotice>
             )}
+            {shouldShowReview && reviewFeedback !== 'dismissed' && (
+              <ReviewPrompt
+                feedbackState={reviewFeedback === 'helpful' ? 'helpful' : 'unasked'}
+                onHelpful={handleReviewHelpful}
+                onReview={handleOpenCommunityListing}
+                onDismiss={handleReviewDismiss}
+              />
+            )}
             {emailCapturePanel && <SectionCard title="Account">{emailCapturePanel}</SectionCard>}
             {!state.isPremium && (
               <UpgradeCard
@@ -2532,14 +2661,6 @@ function App() {
                 onEmailChange={(value) => setState(prev => ({ ...prev, userEmail: value }))}
                 onSave={handleSaveAccountEmail}
                 onDismiss={handleDismissPostSuccessEmail}
-              />
-            )}
-            {shouldShowReview && reviewFeedback !== 'dismissed' && (
-              <ReviewPrompt
-                feedbackState={reviewFeedback === 'helpful' ? 'helpful' : 'unasked'}
-                onHelpful={handleReviewHelpful}
-                onReview={handleOpenCommunityListing}
-                onDismiss={handleReviewDismiss}
               />
             )}
             {accountMenu}
