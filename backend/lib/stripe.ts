@@ -18,10 +18,30 @@ export async function createCheckoutSession(params: {
   trialDays?: number;
 }) {
   const stripe = getStripe();
+  const sessionParams = buildCheckoutSessionParams(params);
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  if (!session.url) {
+    throw new Error('Stripe did not return a checkout URL');
+  }
+
+  return {
+    id: session.id,
+    url: session.url,
+  };
+}
+
+export function buildCheckoutSessionParams(params: {
+  priceId: string;
+  customerEmail: string;
+  successUrl: string;
+  cancelUrl: string;
+  mode?: 'subscription' | 'payment';
+  metadata?: Record<string, string>;
+  trialDays?: number;
+}): Stripe.Checkout.SessionCreateParams {
   const mode = params.mode || 'subscription';
-  
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
-    customer_email: params.customerEmail,
     line_items: [
       {
         price: params.priceId,
@@ -31,6 +51,10 @@ export async function createCheckoutSession(params: {
     mode,
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
+    payment_method_types: ['card'],
+    wallet_options: {
+      link: { display: 'never' },
+    },
     metadata: {
       email: params.customerEmail,
       trial_days: String(params.trialDays || 0),
@@ -45,15 +69,7 @@ export async function createCheckoutSession(params: {
     };
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
-  if (!session.url) {
-    throw new Error('Stripe did not return a checkout URL');
-  }
-
-  return {
-    id: session.id,
-    url: session.url,
-  };
+  return sessionParams;
 }
 
 export async function createPortalSession(customerId: string, returnUrl: string) {

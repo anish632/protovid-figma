@@ -77,6 +77,7 @@ export const eventTypeSchema = z.enum([
   'flow_detection_started',
   'flow_detected',
   'flow_detection_failed',
+  'flow_detection_stuck',
   'prototype_detected',
   'prototype_frames_detected',
   'prototype_path_selected',
@@ -212,6 +213,8 @@ export const checkoutRequestSchema = z.object({
   offerExperimentId: z.string().min(1).max(64).optional(),
   offerExperimentVariant: z.enum(['pro_first', 'project_pass_first']).optional(),
   primaryOffer: z.enum(['monthly', 'large_export']).optional(),
+  pricingPageExperimentId: z.string().min(1).max(64).optional(),
+  pricingPageExperimentVariant: z.enum(['control', 'good_better_best']).optional(),
 });
 
 export const pricingVariantRequestSchema = z.object({

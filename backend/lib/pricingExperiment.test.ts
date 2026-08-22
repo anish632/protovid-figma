@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   OFFER_EXPERIMENT_ID,
+  GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
+  getGoodBetterBestPricingAssignment,
   getLargeFlowPassForEnvironment,
   getMonthlyPricingVariant,
   getOfferExperimentAssignment,
@@ -9,14 +11,34 @@ import {
   getPricingVariantWithPriceId,
 } from './pricingExperiment.js';
 
+test('Good Better Best pricing page assignment is stable for an actor', () => {
+  const first = getGoodBetterBestPricingAssignment('pricing_actor_123');
+  const second = getGoodBetterBestPricingAssignment('pricing_actor_123');
+
+  assert.deepEqual(first, second);
+  assert.equal(first.id, GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID);
+  assert.equal(['control', 'good_better_best'].includes(first.variant), true);
+});
+
 test('Project Pass primary experiment assignment is stable for an actor', () => {
   const first = getOfferExperimentAssignment('pv_actor_123');
   const second = getOfferExperimentAssignment('pv_actor_123');
 
   assert.deepEqual(first, second);
   assert.equal(first.id, OFFER_EXPERIMENT_ID);
-  assert.equal(['pro_first', 'project_pass_first'].includes(first.variant), true);
-  assert.equal(first.primaryOffer, first.variant === 'project_pass_first' ? 'large_export' : 'monthly');
+  assert.equal(first.variant, 'project_pass_first');
+  assert.equal(first.primaryOffer, 'large_export');
+});
+
+test('Project Pass primary experiment ships project_pass_first to everyone', () => {
+  const actors = ['pv_actor_a', 'pv_actor_b', 'pv_actor_c', 'designer@example.com', ''];
+  for (const actor of actors) {
+    assert.deepEqual(getOfferExperimentAssignment(actor), {
+      id: OFFER_EXPERIMENT_ID,
+      variant: 'project_pass_first',
+      primaryOffer: 'large_export',
+    });
+  }
 });
 
 test('Project Pass experiment falls back to Pro first when the pass is unavailable', () => {

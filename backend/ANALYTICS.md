@@ -70,25 +70,28 @@ For an upsell, emit `upsell_card_viewed`; do not reuse `paywall_viewed`.
 `paywallViewedUsers` remains an API compatibility alias for the correctly
 classified quota metric.
 
-## Project Pass primary experiment
+## Project Pass primary experiment (shipped)
 
-The six-week `project_pass_primary_v1` experiment compares the order of the
-same two paid offers after a successful Free export:
+`project_pass_primary_v1` has been shipped: whenever the $4 Project Pass is
+available, every user sees it as the primary post-export offer, with the $5/mo
+Pro plan as secondary. The `pro_first` arm remains as an automatic fallback
+for environments where the Project Pass price ID is not configured.
+
+Historical variants in the experiment:
 
 - `pro_first`: $5/month Pro is primary; the $4 Project Pass is secondary.
 - `project_pass_first`: the $4 Project Pass is primary; Pro is secondary.
 
-Assignment is a stable 50/50 hash of `anonymousId` (email is only a fallback).
 Every `pricing_variant_assigned`, `upsell_card_viewed`, `upgrade_clicked`,
-`checkout_created`, and `payment_confirmed` event carries
+`checkout_created`, and `payment_confirmed` event still carries
 `offer_experiment_id`, `offer_experiment_variant`, and `primary_offer`.
 Stripe Checkout metadata preserves the assignment across the anonymous-to-email
 identity transition.
 
-Use `offerExperiment30d` in `/api/stats`. The decision metric is confirmed
-payments per exposed user, with revenue per exposed user used to break a tie.
-Do not decide from upgrade-click rate alone. Keep both variants live for six
-weeks or until each has at least 100 exposed users and 10 confirmed payments.
+Use `offerExperiment30d` in `/api/stats` to keep tracking the shipped variant's
+absolute performance. New assignments will now all resolve to
+`project_pass_first`; the residual `pro_first` counts represent users who
+were assigned before the ship or who hit the fallback path.
 
 ## Billing lifecycle events
 

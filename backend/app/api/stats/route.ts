@@ -362,6 +362,35 @@ export async function GET(request: NextRequest) {
       ORDER BY variant ASC
     `;
 
+    const pricingPageExperiment = await sql`
+      WITH recent AS (
+        SELECT
+          event_type,
+          metadata::jsonb AS metadata,
+          COALESCE(
+            NULLIF(metadata::jsonb->>'anonymousId', ''),
+            NULLIF(LOWER(email), '')
+          ) AS actor_id,
+          COALESCE(metadata::jsonb->>'pricing_page_experiment_variant', 'unknown') AS variant
+        FROM protovid_events
+        WHERE created_at >= ${last30d}
+          AND metadata::jsonb->>'pricing_page_experiment_id' = 'good_better_best_pricing_v1'
+      )
+      SELECT
+        variant,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'pricing_variant_assigned') AS assigned_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_opened') AS checkout_opened_users,
+        COUNT(DISTINCT COALESCE(NULLIF(metadata->>'stripe_checkout_session_id', ''), actor_id))
+          FILTER (WHERE event_type = 'checkout_created') AS checkout_created,
+        COUNT(DISTINCT COALESCE(NULLIF(metadata->>'stripe_session_id', ''), actor_id))
+          FILTER (WHERE event_type = 'payment_confirmed') AS payments_confirmed,
+        COUNT(DISTINCT COALESCE(NULLIF(metadata->>'stripe_session_id', ''), actor_id))
+          FILTER (WHERE event_type = 'large_flow_pass_purchased') AS project_pass_purchases
+      FROM recent
+      GROUP BY variant
+      ORDER BY variant ASC
+    `;
+
     // Free-tier pressure from persistent subscription rows
     const currentMonth = new Date().toISOString().slice(0, 7);
     const [freeTierPressure] = await sql`
@@ -518,6 +547,18 @@ export async function GET(request: NextRequest) {
           assignedUsers: parseInt(row.assigned_users || '0'),
           exposedUsers: parseInt(row.exposed_users || '0'),
           upgradeClickedUsers: parseInt(row.upgrade_clicked_users || '0'),
+          checkoutCreated: parseInt(row.checkout_created || '0'),
+          paymentsConfirmed: parseInt(row.payments_confirmed || '0'),
+          projectPassPurchases: parseInt(row.project_pass_purchases || '0'),
+        })),
+      },
+      pricingPageExperiment30d: {
+        experimentId: 'good_better_best_pricing_v1',
+        successMetric: 'payment-confirmed rate by pricing-page visitor assignment',
+        variants: pricingPageExperiment.map((row: any) => ({
+          variant: row.variant,
+          assignedUsers: parseInt(row.assigned_users || '0'),
+          checkoutOpenedUsers: parseInt(row.checkout_opened_users || '0'),
           checkoutCreated: parseInt(row.checkout_created || '0'),
           paymentsConfirmed: parseInt(row.payments_confirmed || '0'),
           projectPassPurchases: parseInt(row.project_pass_purchases || '0'),

@@ -11,8 +11,10 @@ export type PricingVariantId = 'monthly_5';
 export type OneTimeOfferId = 'large_flow_pass';
 export type OfferExperimentVariant = 'pro_first' | 'project_pass_first';
 export type PrimaryOffer = 'monthly' | 'large_export';
+export type GoodBetterBestPricingVariant = 'control' | 'good_better_best';
 
 export const OFFER_EXPERIMENT_ID = 'project_pass_primary_v1';
+export const GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID = 'good_better_best_pricing_v1';
 
 export interface PricingVariant {
   id: PricingVariantId;
@@ -76,7 +78,8 @@ export function getOfferExperimentAssignment(
   variant: OfferExperimentVariant;
   primaryOffer: PrimaryOffer;
 } {
-  const variant: OfferExperimentVariant = projectPassAvailable && stableEmailHash(actorKey) % 2 === 1
+  void actorKey;
+  const variant: OfferExperimentVariant = projectPassAvailable
     ? 'project_pass_first'
     : 'pro_first';
 
@@ -84,6 +87,22 @@ export function getOfferExperimentAssignment(
     id: OFFER_EXPERIMENT_ID,
     variant,
     primaryOffer: variant === 'project_pass_first' ? 'large_export' : 'monthly',
+  };
+}
+
+export function getGoodBetterBestPricingAssignment(
+  actorKey: string,
+): {
+  id: typeof GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID;
+  variant: GoodBetterBestPricingVariant;
+} {
+  const variant: GoodBetterBestPricingVariant = stableEmailHash(actorKey) % 2 === 1
+    ? 'good_better_best'
+    : 'control';
+
+  return {
+    id: GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
+    variant,
   };
 }
 

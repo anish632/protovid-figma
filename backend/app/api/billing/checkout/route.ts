@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
       offerExperimentId,
       offerExperimentVariant,
       primaryOffer,
+      pricingPageExperimentId,
+      pricingPageExperimentVariant,
     } = checkoutRequestSchema.parse(body);
     const selectedPlan = plan === 'large_export' ? 'large_export' : 'monthly';
     const existingSubscription = await getSubscription(email);
@@ -78,6 +80,8 @@ export async function POST(request: NextRequest) {
       offer_experiment_id: offerExperimentId || null,
       offer_experiment_variant: offerExperimentVariant || null,
       primary_offer: primaryOffer || null,
+      pricing_page_experiment_id: pricingPageExperimentId || null,
+      pricing_page_experiment_variant: pricingPageExperimentVariant || null,
       ...(anonymousId ? { anonymousId } : {}),
     });
 
@@ -97,6 +101,8 @@ export async function POST(request: NextRequest) {
         offer_experiment_id: offerExperimentId || '',
         offer_experiment_variant: offerExperimentVariant || '',
         primary_offer: primaryOffer || '',
+        pricing_page_experiment_id: pricingPageExperimentId || '',
+        pricing_page_experiment_variant: pricingPageExperimentVariant || '',
         trial_enabled: 'false',
         ...(anonymousId ? { anonymousId } : {}),
       },
@@ -114,6 +120,8 @@ export async function POST(request: NextRequest) {
         offer_experiment_id: offerExperimentId || null,
         offer_experiment_variant: offerExperimentVariant || null,
         primary_offer: primaryOffer || null,
+        pricing_page_experiment_id: pricingPageExperimentId || null,
+        pricing_page_experiment_variant: pricingPageExperimentVariant || null,
         stripe_checkout_session_id: checkoutSession.id,
         ...(anonymousId ? { anonymousId } : {}),
       });

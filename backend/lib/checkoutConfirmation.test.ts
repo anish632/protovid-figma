@@ -82,6 +82,8 @@ test('checkout event metadata preserves pricing variant attribution', () => {
     offer_experiment_id: null,
     offer_experiment_variant: null,
     primary_offer: null,
+    pricing_page_experiment_id: null,
+    pricing_page_experiment_variant: null,
   });
 });
 
@@ -102,6 +104,25 @@ test('checkout event metadata preserves paid-offer experiment attribution', () =
   assert.equal(metadata.offer_experiment_id, 'project_pass_primary_v1');
   assert.equal(metadata.offer_experiment_variant, 'project_pass_first');
   assert.equal(metadata.primary_offer, 'large_export');
+});
+
+test('checkout event metadata preserves pricing page experiment attribution', () => {
+  const metadata = getCheckoutEventMetadata({
+    id: 'cs_test_pricing_page_experiment',
+    customer: 'cus_test',
+    customer_details: null,
+    customer_email: 'designer@example.com',
+    metadata: {
+      pricing_page_experiment_id: 'good_better_best_pricing_v1',
+      pricing_page_experiment_variant: 'good_better_best',
+      anonymousId: 'pricing_actor_123',
+    },
+    subscription: null,
+  }, 'stripe_webhook');
+
+  assert.equal(metadata.pricing_page_experiment_id, 'good_better_best_pricing_v1');
+  assert.equal(metadata.pricing_page_experiment_variant, 'good_better_best');
+  assert.equal(metadata.anonymousId, 'pricing_actor_123');
 });
 
 test('checkout confirmation builds temporary Pro access for large flow pass', () => {

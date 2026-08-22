@@ -96,4 +96,6 @@ Events to subscribe to:
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_succeeded`
 - `invoice.payment_failed`

@@ -2,7 +2,7 @@ import './landing.css';
 
 export const metadata = {
   title: 'ProtoVid — Figma Prototype Review Walkthroughs',
-  description: 'Turn connected Figma prototype flows into MP4 walkthroughs with browser-based timestamped feedback and approval. Start free.',
+  description: 'Turn connected Figma prototype flows into MP4, WebM, and GIF exports with browser-based timestamped feedback and approval. Start free.',
   metadataBase: new URL('https://protovid.dasgroupllc.com'),
   openGraph: {
     title: 'ProtoVid — Review Figma prototype flows without screen recording',

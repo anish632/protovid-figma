@@ -62,6 +62,8 @@ export function getCheckoutEventMetadata(
     offer_experiment_id: session.metadata?.offer_experiment_id || null,
     offer_experiment_variant: session.metadata?.offer_experiment_variant || null,
     primary_offer: session.metadata?.primary_offer || null,
+    pricing_page_experiment_id: session.metadata?.pricing_page_experiment_id || null,
+    pricing_page_experiment_variant: session.metadata?.pricing_page_experiment_variant || null,
     ...(session.metadata?.anonymousId ? { anonymousId: session.metadata.anonymousId } : {}),
   };
 }
