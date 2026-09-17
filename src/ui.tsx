@@ -3,12 +3,15 @@ import { h, render } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { encodeVideo, type EncodeTelemetryEvent } from './encoder';
 import {
+  isValidAccountEmail,
   getExportProgressModel,
   getExperimentPrimaryPlan,
   getExportSummaryCopy,
   getPrimaryActionModel,
   getRecoverableErrorModel,
   getRemainingExportsCopy,
+  getCheckoutConfirmCopy,
+  getPaidAccessActivatedNotice,
   getRestoreResultModel,
   getShareExperimentVariant,
   getResolutionOptions,
@@ -63,6 +66,7 @@ interface AppState {
   stage: 'loading' | 'setup' | 'scanning' | 'exporting' | 'complete' | 'checking-payment';
   hasPrototype: boolean;
   frameCount: number;
+  unconnectedFrameCount: number;
   prototypePaths: PrototypePath[];
   selectedPathId: string;
   pathSelectionRequired: boolean;
@@ -164,7 +168,7 @@ interface FlowAnalysis {
 }
 
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
-const PLUGIN_VERSION = '1.3.16';
+import { PLUGIN_VERSION } from './version';
 type UpgradeSource = 'upsell_card' | 'free_limit_paywall' | 'large_flow_pass';
 type CheckoutPlan = 'monthly' | 'large_export';
 
@@ -293,6 +297,7 @@ function App() {
     stage: 'loading',
     hasPrototype: false,
     frameCount: 0,
+    unconnectedFrameCount: 0,
     prototypePaths: [],
     selectedPathId: '',
     pathSelectionRequired: false,
@@ -306,7 +311,7 @@ function App() {
     isPremium: false,
     userEmail: '',
     paymentCheckAvailable: false,
-    pricingVariant: 'monthly_5',
+    pricingVariant: 'studio_monthly',
     monthlyPriceLabel: PRO_PRICE_MONTHLY_DISPLAY,
     monthlyAmountCents: PRO_PRICE_MONTHLY_CENTS,
     pricingLoadedEmail: '',
@@ -315,8 +320,8 @@ function App() {
     largeFlowPassAmountCents: LARGE_FLOW_PASS_CENTS,
     largeFlowPassAccessDays: LARGE_FLOW_PASS_ACCESS_DAYS,
     offerExperimentId: 'project_pass_primary_v1',
-    offerExperimentVariant: 'pro_first',
-    primaryOffer: 'monthly',
+    offerExperimentVariant: 'project_pass_first',
+    primaryOffer: 'large_export',
     pendingCheckoutUrl: '',
     pendingCheckoutEmail: '',
     pendingCheckoutPlan: '',
@@ -493,6 +498,7 @@ function App() {
             ...prev,
             stage: 'setup',
             hasPrototype: msg.data.hasPrototype,
+            unconnectedFrameCount: typeof msg.data.unconnectedFrameCount === 'number' ? msg.data.unconnectedFrameCount : 0,
             frameCount: msg.data.frameCount,
             prototypePaths: initPaths,
             pathSelectionRequired: msg.data.pathSelectionRequired === true,
@@ -567,7 +573,7 @@ function App() {
             notice: restored
               ? getRestoreResultModel(paidAccessFound ? 'restored' : 'not-found').message
               : switched
-                ? paidAccessFound ? 'Account switched. Pro is active.' : 'Account switched. Your free allowance is available.'
+                ? paidAccessFound ? 'Account switched. Studio is active.' : 'Account switched. Your free allowance is available.'
                 : savedFromSuccess
                   ? 'Email saved. Upgrade checkout will be faster next time.'
                   : prev.notice
@@ -587,6 +593,7 @@ function App() {
             stage: 'setup',
             hasPrototype: scannedFrameCount > 0,
             frameCount: scannedFrameCount,
+            unconnectedFrameCount: typeof msg.data.unconnectedFrameCount === 'number' ? msg.data.unconnectedFrameCount : 0,
             prototypePaths: Array.isArray(msg.data.paths) ? msg.data.paths : prev.prototypePaths,
             pathSelectionRequired: msg.data.pathSelectionRequired === true,
             pathEnumerationTruncated: msg.data.pathEnumerationTruncated === true,
@@ -1027,7 +1034,7 @@ function App() {
             checkoutState: 'pending'
           }));
           // Start auto-polling for payment completion
-          startPaymentPolling(msg.data.email);
+          startPaymentPolling(msg.data.email, msg.data.plan || '');
           break;
 
         case 'free-limit-reached':
@@ -1115,6 +1122,7 @@ function App() {
               trigger: 'free_limit_ui_shown',
               exportCount: state.entitlement.freeExportsUsed,
               freeLimit: state.entitlement.freeExportsLimit,
+              free_tier_experiment_id: state.entitlement.freeTierExperimentId || null,
               pricingVariant: state.pricingVariant,
               priceLabel: state.monthlyPriceLabel,
               amountCents: state.monthlyAmountCents,
@@ -1269,9 +1277,10 @@ function App() {
   }, [state.stage, state.isPremium, state.userEmail, state.entitlement, state.activeExportFrameCount, state.frameCount, state.activeExportAttemptId]);
 
   // Auto-poll for payment completion after checkout
-  const startPaymentPolling = (email: string) => {
+  const startPaymentPolling = (email: string, plan: CheckoutPlan | '' = '') => {
     stopPaymentPolling();
     const pollGeneration = pollGenerationRef.current;
+    const confirmedPlan: CheckoutPlan = plan === 'large_export' ? 'large_export' : 'monthly';
 
     setState(prev => ({ ...prev, stage: 'checking-payment', checkoutState: 'pending' }));
     parent.postMessage({
@@ -1279,7 +1288,7 @@ function App() {
         type: 'track-event',
         data: {
           eventType: 'payment_poll_started',
-          metadata: { source: 'plugin_poll' }
+          metadata: { source: 'plugin_poll', plan: confirmedPlan }
         }
       }
     }, '*');
@@ -1316,8 +1325,8 @@ function App() {
           if (data.valid && data.tier === 'pro') {
             // Payment confirmed!
             if (!finishCurrentPoll()) return;
-            trackUiEvent('payment_completed', { source: 'plugin_poll', plan: 'monthly' });
-            trackUiEvent('payment_confirmed', { source: 'plugin_poll', plan: 'monthly' });
+            trackUiEvent('payment_completed', { source: 'plugin_poll', plan: confirmedPlan });
+            trackUiEvent('payment_confirmed', { source: 'plugin_poll', plan: confirmedPlan });
             setState(prev => ({
               ...prev,
               stage: 'setup',
@@ -1329,7 +1338,7 @@ function App() {
               pendingCheckoutPlan: '',
               pendingCheckoutSessionId: '',
               checkoutState: 'success',
-              notice: 'Pro is active. Client-ready resolutions are now available.'
+              notice: getPaidAccessActivatedNotice(confirmedPlan),
             }));
             // Notify plugin code
             parent.postMessage({
@@ -1488,6 +1497,8 @@ function App() {
       format: state.settings.format,
       isPremium: state.isPremium,
       remainingExports: state.entitlement.freeExportsRemaining,
+      freeLimit: state.entitlement.freeExportsLimit,
+      free_tier_experiment_id: state.entitlement.freeTierExperimentId || null,
       frameCount: selectedPathFrameCount,
     });
     setState(prev => ({
@@ -1532,13 +1543,15 @@ function App() {
 
   const handleOpenCheckout = (
     source: UpgradeSource = freeUsed ? 'free_limit_paywall' : 'upsell_card',
-    plan: CheckoutPlan = 'monthly'
+    plan: CheckoutPlan = 'monthly',
+    fromEmailPrompt = false
   ) => {
-    const email = state.userEmail;
+    if (checkoutRequestLockedRef.current) return;
+    const email = state.userEmail.trim().toLowerCase();
     upgradeSourceRef.current = source;
     upgradePlanRef.current = plan;
     const isLargeFlowPass = plan === 'large_export';
-    trackUiEvent('upgrade_clicked', {
+    trackUiEvent(fromEmailPrompt ? 'checkout_email_submitted' : 'upgrade_clicked', {
       source,
       plan,
       upsell_context: source === 'large_flow_pass' ? 'project_delivery' : source === 'free_limit_paywall' ? 'free_limit' : 'post_export',
@@ -1548,9 +1561,14 @@ function App() {
       offer_experiment_id: state.offerExperimentId,
       offer_experiment_variant: state.offerExperimentVariant,
       primary_offer: state.primaryOffer,
+      freeLimit: state.entitlement?.freeExportsLimit ?? null,
+      free_tier_experiment_id: state.entitlement?.freeTierExperimentId || null,
       frameCount: selectedPathFrameCount
     });
-    if (!email || !email.includes('@')) {
+    if (!isValidAccountEmail(email)) {
+      if (fromEmailPrompt) {
+        trackUiEvent('checkout_email_validation_failed', { source, plan, reason: 'invalid_email' });
+      }
       // Reveal the inline email field instead of blocking — we only need an
       // email to attach the subscription, collected right at checkout.
       setNeedEmail(true);
@@ -1573,6 +1591,8 @@ function App() {
               offer_experiment_id: state.offerExperimentId,
               offer_experiment_variant: state.offerExperimentVariant,
               primary_offer: state.primaryOffer,
+              freeLimit: state.entitlement?.freeExportsLimit ?? null,
+              free_tier_experiment_id: state.entitlement?.freeTierExperimentId || null,
               frameCount: selectedPathFrameCount
             }
           }
@@ -1627,7 +1647,10 @@ function App() {
       }
     }, '*');
     if (state.pendingCheckoutEmail || state.userEmail) {
-      startPaymentPolling(state.pendingCheckoutEmail || state.userEmail);
+      startPaymentPolling(
+        state.pendingCheckoutEmail || state.userEmail,
+        state.pendingCheckoutPlan || '',
+      );
     }
   };
 
@@ -1639,12 +1662,12 @@ function App() {
         type: 'track-event',
         data: {
           eventType: 'payment_status_checked',
-          metadata: { source: 'manual' }
+          metadata: { source: 'manual', plan: state.pendingCheckoutPlan || 'monthly' }
         }
       }
     }, '*');
     setState(prev => ({ ...prev, stage: 'checking-payment', paymentCheckAvailable: false }));
-    startPaymentPolling(email);
+    startPaymentPolling(email, state.pendingCheckoutPlan || '');
   };
 
   const handleClosePlugin = () => {
@@ -1668,7 +1691,7 @@ function App() {
   };
 
   const handleOpenSubscriptionManagement = () => {
-    if (!state.isPremium || state.entitlement?.billingAccessKind === 'one_time_access') return;
+    if (state.entitlement?.billingAccessKind === 'one_time_access') return;
     parent.postMessage({ pluginMessage: { type: 'open-billing-portal' } }, '*');
   };
 
@@ -1774,7 +1797,7 @@ function App() {
   const remainingExports = state.entitlement?.freeExportsRemaining ?? 0;
   const freeUsed = state.entitlement?.upgradeRequired ?? false;
   const collectEmail = needEmail;
-  const validEmail = state.userEmail.trim().includes('@');
+  const validEmail = isValidAccountEmail(state.userEmail);
   const selectedPath = state.prototypePaths.find(path => path.id === state.selectedPathId) || null;
   const selectedPathFrameCount = selectedPath?.frameCount || state.frameCount;
   const hasMultiplePaths = state.prototypePaths.length > 1;
@@ -1863,14 +1886,14 @@ function App() {
   const primaryAction = primaryActionBase.intent === 'upgrade' && conversionPrimaryPlan === 'large_export'
     ? {
         ...primaryActionBase,
-        label: 'Export clean HD/4K',
-        supportingText: `${LARGE_FLOW_PASS_DISPLAY} once for this project.`,
+        label: 'Buy Project Pass',
+        supportingText: `${state.largeFlowPassLabel} for seven days of clean HD/4K exports.`,
       }
     : primaryActionBase.intent === 'upgrade'
       ? {
           ...primaryActionBase,
-          label: 'Unlock clean HD/4K',
-          supportingText: `${PRO_PRICE_MONTHLY_DISPLAY} for recurring client-ready exports.`,
+          label: 'Start Studio',
+          supportingText: `${PRO_PRICE_MONTHLY_DISPLAY} for recurring client-ready review workflows.`,
         }
       : primaryActionBase;
   const selectedStartName = selectedPath?.startNodeName || null;
@@ -2084,11 +2107,9 @@ function App() {
       }
 
       await copyText(data.url);
-      setState(prev => ({ ...prev, shareUrl: data.url, ownerShareUrl: typeof data.ownerUrl === 'string' ? data.ownerUrl : null, shareState: 'ready', notice: 'Review link copied. It expires automatically.' }));
+      setState(prev => ({ ...prev, shareUrl: data.url, ownerShareUrl: typeof data.ownerUrl === 'string' ? data.ownerUrl : null, shareState: 'ready', notice: 'Approval link copied. It includes the video, decision brief, comments, and status.' }));
       trackUiEvent('share_link_copied', { source: 'success_screen', reused: false, variant: experimentVariant });
-      if (experimentVariant === 'invite_panel') {
-        trackUiEvent('review_invite_panel_shown', { source: 'success_screen', variant: experimentVariant });
-      }
+      trackUiEvent('review_invite_panel_shown', { source: 'success_screen', variant: experimentVariant });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create a share link.';
       setState(prev => ({ ...prev, shareState: 'error', notice: `${message} Your ${selectedFormatLabel} is still ready to download.` }));
@@ -2137,8 +2158,8 @@ function App() {
   const handleEmailInvite = (email: string) => {
     if (!state.shareUrl || !email.includes('@')) return;
     const filename = state.downloadFilename || 'ProtoVid walkthrough';
-    const subject = encodeURIComponent(`Review ${filename}`);
-    const body = encodeURIComponent(`Hi,\n\nPlease review this ProtoVid walkthrough and leave timestamped feedback here:\n${state.shareUrl}\n\nThanks!`);
+    const subject = encodeURIComponent(`Review and approve ${filename}`);
+    const body = encodeURIComponent(`Hi,\n\nPlease review this ProtoVid walkthrough, leave timestamped feedback, and mark whether it is approved here:\n${state.shareUrl}\n\nThanks!`);
     trackUiEvent('review_invite_email_clicked', { source: 'invite_panel', variant: getShareExperimentVariant(state.anonymousId) });
     window.location.href = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
     setState(prev => ({ ...prev, notice: `Email invite prepared for ${email}.` }));
@@ -2286,6 +2307,19 @@ function App() {
     }
   };
 
+  const handleDismissCheckoutEmail = () => {
+    trackUiEvent('checkout_email_abandoned', {
+      source: upgradeSourceRef.current,
+      plan: upgradePlanRef.current,
+      pricingVariant: state.pricingVariant,
+      offer_experiment_id: state.offerExperimentId,
+      offer_experiment_variant: state.offerExperimentVariant,
+      primary_offer: state.primaryOffer,
+    });
+    setNeedEmail(false);
+    setEmailIntent('checkout');
+  };
+
   const emailCapturePanel = collectEmail ? (
     <div class="email-capture" role="region" aria-labelledby="email-capture-heading">
       <h3 id="email-capture-heading">
@@ -2297,7 +2331,7 @@ function App() {
               ? 'Save your account email'
             : upgradePlanRef.current === 'large_export'
               ? 'Continue to Project Pass'
-              : 'Continue to Pro'}
+              : 'Continue to Studio'}
       </h3>
       <p>
         {emailIntent === 'restore'
@@ -2307,8 +2341,8 @@ function App() {
           : emailIntent === 'save'
             ? 'Save your email to track free exports and unlock faster checkout.'
           : upgradePlanRef.current === 'large_export'
-            ? 'Enter the email to attach to your seven-day Project Pass.'
-            : 'Enter the email to attach to your subscription.'}
+            ? `${state.largeFlowPassLabel} · 7 days of unlimited clean exports, including 1080p and 4K. No subscription. Use your email to unlock and restore access.`
+            : `${state.monthlyPriceLabel} · Unlimited clean exports, including 1080p and 4K. Renews monthly; cancel in Account. Use your email to unlock and restore access.`}
       </p>
       <label class="field-label" for="account-email">Email address</label>
       <input
@@ -2324,18 +2358,19 @@ function App() {
             ? handleRestorePurchase()
             : emailIntent === 'switch'
               ? handleSwitchAccount()
-            : handleOpenCheckout(upgradeSourceRef.current, upgradePlanRef.current);
+            : emailIntent === 'save' ? handleSaveAccountEmail() : handleOpenCheckout(upgradeSourceRef.current, upgradePlanRef.current, true);
         }}
       />
+      {state.userEmail.trim() && !validEmail && <p role="status">Enter a complete email, such as you@example.com.</p>}
       <button
         class="upgrade-cta"
         type="button"
-        disabled={!validEmail || state.restoreState === 'checking'}
+        disabled={!validEmail || state.restoreState === 'checking' || state.checkoutState === 'opening'}
         onClick={() => emailIntent === 'restore'
           ? handleRestorePurchase()
           : emailIntent === 'switch'
             ? handleSwitchAccount()
-          : handleOpenCheckout(upgradeSourceRef.current, upgradePlanRef.current)}
+          : emailIntent === 'save' ? handleSaveAccountEmail() : handleOpenCheckout(upgradeSourceRef.current, upgradePlanRef.current, true)}
       >
         {state.restoreState === 'checking'
           ? 'Checking purchase…'
@@ -2343,18 +2378,25 @@ function App() {
             ? 'Restore purchase'
             : emailIntent === 'switch'
               ? 'Use this email'
+            : emailIntent === 'save'
+              ? 'Save email'
             : upgradePlanRef.current === 'large_export'
               ? `Continue — ${state.largeFlowPassLabel}`
               : `Continue — ${state.monthlyPriceLabel}`}
       </button>
-      {emailIntent === 'checkout' && <span class="stripe-note">Secure checkout powered by Stripe.</span>}
+      {emailIntent === 'checkout' && (
+        <>
+          <span class="stripe-note">Review and pay securely on Stripe. No charge at this step.</span>
+          <button class="text-button centered" type="button" onClick={handleDismissCheckoutEmail}>Back to plans</button>
+        </>
+      )}
     </div>
   ) : null;
 
   const accountMenu = (
     <AccountMenu
       isPro={state.isPremium}
-      canManage={state.isPremium && !isOneTimeAccess}
+      canManage={(state.isPremium || Boolean(state.entitlement?.billingNotice)) && !isOneTimeAccess}
       onRestore={handleStartRestorePurchase}
       onUseAnotherEmail={handleStartUseAnotherEmail}
       onManage={handleOpenSubscriptionManagement}
@@ -2401,9 +2443,20 @@ function App() {
         voiceError={voiceError}
         onVoiceToggle={startVoiceListening}
         showUpgradePlan={!state.isPremium}
+        upgradePlanLabel={conversionPrimaryPlan === 'large_export' ? 'Buy Project Pass' : 'Start Studio'}
         upgradePlanDisabled={state.checkoutState === 'opening'}
-        onUpgradePlan={() => handleOpenCheckout('upsell_card', 'monthly')}
+        onUpgradePlan={() => handleOpenCheckout('upsell_card', conversionPrimaryPlan)}
       />
+
+      {state.stage !== 'loading' && state.entitlement?.billingNotice && (
+        <section class="billing-notice" aria-label="Subscription billing" role="status">
+          <strong>{state.entitlement.billingNotice.title}</strong>
+          <p>{state.entitlement.billingNotice.message}</p>
+          <button type="button" class="secondary-btn" onClick={handleOpenSubscriptionManagement}>
+            {state.entitlement.billingNotice.actionLabel}
+          </button>
+        </section>
+      )}
 
       {state.stage === 'loading' && (
         <main class="state-screen loading-screen" aria-busy="true" aria-labelledby="loading-heading">
@@ -2427,8 +2480,8 @@ function App() {
         <main class="state-screen checkout-screen" aria-busy="true" aria-labelledby="checkout-heading">
           <div class="state-icon state-icon-progress"><span /></div>
           <p class="state-eyebrow">Account</p>
-          <h1 id="checkout-heading">Confirming Pro</h1>
-          <p class="state-description" role="status" aria-live="polite">Complete checkout in your browser. ProtoVid will detect access automatically.</p>
+          <h1 id="checkout-heading">{getCheckoutConfirmCopy(state.pendingCheckoutPlan).heading}</h1>
+          <p class="state-description" role="status" aria-live="polite">{getCheckoutConfirmCopy(state.pendingCheckoutPlan).body}</p>
           <InlineNotice>Your selected flow and export setup are preserved.</InlineNotice>
           <button class="secondary-button" type="button" onClick={handleCancelPaymentCheck}>Back to export setup</button>
         </main>
@@ -2445,7 +2498,15 @@ function App() {
               onPrimary={state.entitlementError ? handleRetryEntitlement : handleScanPrototype}
             />
           )}
-          <EmptyState onRefresh={handleScanPrototype} onClose={handleClosePlugin} onOpenGuide={handleOpenSetupGuide} />
+          <EmptyState unconnectedFrameCount={state.unconnectedFrameCount} onRefresh={handleScanPrototype} onClose={handleClosePlugin} onOpenGuide={handleOpenSetupGuide} onConnectExistingFrames={() => {
+            trackUiEvent('setup_frames_autoconnect_requested', { frameCount: state.unconnectedFrameCount });
+            setState(prev => ({ ...prev, stage: 'scanning', error: null }));
+            parent.postMessage({ pluginMessage: { type: 'connect-existing-frames' } }, '*');
+          }} onCreateExample={(slug, source) => {
+            trackUiEvent('setup_example_selected', { source, example: slug });
+            setState(prev => ({ ...prev, stage: 'scanning', error: null }));
+            parent.postMessage({ pluginMessage: { type: 'create-example-prototype', data: { slug, source } } }, '*');
+          }} />
           {emailCapturePanel && <SectionCard title="Account">{emailCapturePanel}</SectionCard>}
           {accountMenu}
         </div>
@@ -2476,7 +2537,11 @@ function App() {
                 <InlineNotice tone="warning">Frame dimensions vary. ProtoVid will fit each frame to the selected output size.</InlineNotice>
               )}
               {state.checkoutState === 'success' && state.isPremium && (
-                <InlineNotice tone="success">Pro is active. Your next step is to export this flow in the selected quality.</InlineNotice>
+                <InlineNotice tone="success">
+                  {isOneTimeAccess
+                    ? getPaidAccessActivatedNotice('large_export')
+                    : getPaidAccessActivatedNotice('monthly')}
+                </InlineNotice>
               )}
               {needsLargePathWarning && (
                 <InlineNotice tone="warning">This is a very large flow. A shorter path or 720p will be more reliable.</InlineNotice>
@@ -2532,7 +2597,7 @@ function App() {
                 <TrustRow />
               </SectionCard>
 
-              {freeUsed && (
+              {freeUsed && !collectEmail && (
                 <UpgradeChoicePanel
                   frameCount={selectedPathFrameCount}
                   estimatedDuration={estimatedDuration}
@@ -2634,7 +2699,7 @@ function App() {
                   : 'Delivered with a safer compatibility profile. Your selected quality remains unchanged for the next export.'}
               </InlineNotice>
             )}
-            {shouldShowReview && reviewFeedback !== 'dismissed' && (
+            {shouldShowReview && reviewFeedback !== 'dismissed' && !collectEmail && (
               <ReviewPrompt
                 feedbackState={reviewFeedback === 'helpful' ? 'helpful' : 'unasked'}
                 onHelpful={handleReviewHelpful}
@@ -2643,7 +2708,7 @@ function App() {
               />
             )}
             {emailCapturePanel && <SectionCard title="Account">{emailCapturePanel}</SectionCard>}
-            {!state.isPremium && (
+            {!state.isPremium && !collectEmail && (
               <UpgradeCard
                 monthlyLabel={state.monthlyPriceLabel.replace('/mo', '/month')}
                 onMonthly={() => handleOpenCheckout('upsell_card', 'monthly')}

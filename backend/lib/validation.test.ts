@@ -3,6 +3,8 @@ import test from 'node:test';
 import { trackingRequestSchema } from './validation.js';
 
 const redesignTrackingEvents = [
+  'setup_example_selected',
+  'setup_guide_opened',
   'flow_detection_started',
   'flow_detected',
   'flow_detection_failed',
@@ -44,6 +46,7 @@ const redesignTrackingEvents = [
   'client_review_link_clicked',
   'copy_export_details_clicked',
   'payment_completed',
+  'checkout_email_abandoned',
 ] as const;
 
 test('tracking schema accepts redesign analytics events', () => {

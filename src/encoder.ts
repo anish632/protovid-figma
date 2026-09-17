@@ -6,7 +6,7 @@ import { Muxer as MP4Muxer, ArrayBufferTarget as MP4ArrayBufferTarget, type Muxe
 import { Muxer as WebMMuxer, ArrayBufferTarget as WebMArrayBufferTarget, type MuxerOptions as WebMMuxerOptions } from 'webm-muxer';
 import { BACKEND_MAX_UPLOAD_BYTES, getPayloadPreflight } from './exportPreflight';
 
-const PLUGIN_VERSION = '1.3.15';
+const PLUGIN_VERSION = '1.3.21';
 
 // Screen-level transition metadata captured from prototype reactions. Drives the
 // synthesized "transition effects" (fade/slide) between frames and the

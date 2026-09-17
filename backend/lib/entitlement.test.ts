@@ -15,13 +15,14 @@ test('free entitlement allows backend-configured watermarked exports', () => {
     lastResetMonth: '2026-06',
   }, billingDate);
 
-  assert.equal(FREE_TIER_EXPORT_LIMIT, 3);
+  assert.equal(FREE_TIER_EXPORT_LIMIT, 1);
   assert.equal(entitlement.canExport, true);
   assert.equal(entitlement.watermarkRequired, true);
-  assert.equal(entitlement.freeExportsLimit, 3);
+  assert.equal(entitlement.freeTierExperimentId, 'one_export_v1');
+  assert.equal(entitlement.freeExportsLimit, 1);
   assert.equal(entitlement.freeExportsUsed, 0);
-  assert.equal(entitlement.freeExportsRemaining, 3);
-  assert.equal(formatQuotaText(entitlement), '3 free exports remaining this month');
+  assert.equal(entitlement.freeExportsRemaining, 1);
+  assert.equal(formatQuotaText(entitlement), '1 free export remaining this month');
 });
 
 test('free entitlement blocks export when the backend quota is exhausted', () => {
@@ -29,7 +30,7 @@ test('free entitlement blocks export when the backend quota is exhausted', () =>
     email: 'pv_exhausted',
     tier: 'free',
     status: 'active',
-    exportsThisMonth: 3,
+    exportsThisMonth: 1,
     lastResetMonth: '2026-06',
   }, billingDate);
 
@@ -73,14 +74,18 @@ test('UI quota helper uses backend values and has no fallback to three', () => {
   assert.equal(formatQuotaText(entitlement), '1 free export remaining this month');
 });
 
-test('UI quota helper displays three when the backend entitlement returns three', () => {
-  const entitlement = buildEntitlementResponse('pv_limit_three', {
+test('UI quota helper displays plural limits returned by the backend', () => {
+  const entitlement = {
+    ...buildEntitlementResponse('pv_limit_three', {
     email: 'pv_limit_three',
     tier: 'free',
     status: 'active',
     exportsThisMonth: 0,
     lastResetMonth: '2026-06',
-  }, billingDate);
+    }, billingDate),
+    freeExportsLimit: 3,
+    freeExportsRemaining: 3,
+  };
 
   assert.equal(formatQuotaText(entitlement), '3 free exports remaining this month');
 });

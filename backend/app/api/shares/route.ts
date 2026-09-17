@@ -5,6 +5,7 @@ import { cleanupExpiredShares, createShare, MAX_SHARE_BYTES, normalizeShareExper
 import { getSubscription } from '@/lib/storage';
 import { isPremiumSubscription } from '@/lib/plans';
 import { createReviewRoom } from '@/lib/reviewStorage';
+import { mediaRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +20,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = mediaRateLimit(request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const rawEmail = request.headers.get('x-user-email');
     const parsedEmail = rawEmail ? emailSchema.safeParse(rawEmail) : null;

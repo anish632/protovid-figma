@@ -30,11 +30,9 @@ test('paid-offer experiment honors Project Pass only when it is available', () =
   assert.equal(getExperimentPrimaryPlan('monthly', true), 'monthly');
 });
 
-test('share experiment assignment is stable and uses supported variants', () => {
-  const first = getShareExperimentVariant('pv_user_123');
-  assert.equal(getShareExperimentVariant('pv_user_123'), first);
-  assert.equal(['control', 'invite_panel'].includes(first), true);
-  assert.equal(['control', 'invite_panel'].includes(getShareExperimentVariant(null)), true);
+test('reviewer invitation loop ships to every completed share', () => {
+  assert.equal(getShareExperimentVariant('pv_user_123'), 'invite_panel');
+  assert.equal(getShareExperimentVariant(null), 'invite_panel');
 });
 
 test('recommended path prefers the shortest reliable route', () => {
@@ -72,8 +70,8 @@ test('Free resolution options identify Pro restrictions without disabling select
     isSelectable,
   })), [
     { value: '720p', availability: 'included', badge: null, isSelectable: true },
-    { value: '1080p', availability: 'requires-pro', badge: 'Pro', isSelectable: true },
-    { value: '4K', availability: 'requires-pro', badge: 'Pro', isSelectable: true },
+    { value: '1080p', availability: 'requires-pro', badge: 'Studio', isSelectable: true },
+    { value: '4K', availability: 'requires-pro', badge: 'Studio', isSelectable: true },
   ]);
 });
 
@@ -93,7 +91,7 @@ test('Free users can select a Pro resolution and receive an upgrade explanation'
     resolution: '1080p',
     canExport: false,
     requiresUpgrade: true,
-    message: '1080p is available with Pro for a clean, client-ready export.',
+    message: '1080p is available with Project Pass or Studio for a clean, client-ready export.',
   });
 });
 
@@ -133,7 +131,7 @@ test('primary action uses the requested Free and Pro copy', () => {
 test('successful export keeps file download as the primary action', () => {
   assert.deepEqual(getSuccessActions(true).slice(0, 2), [
     { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
-    { id: 'share', label: 'Create client review link', priority: 'secondary', enabled: true },
+    { id: 'share', label: 'Create approval link', priority: 'secondary', enabled: true },
   ]);
 });
 
@@ -145,8 +143,8 @@ test('primary action turns a selected Pro resolution into an explicit upgrade ac
   });
 
   assert.deepEqual(action, {
-    label: 'Upgrade for 1080p',
-    supportingText: 'Export in HD or 4K without the watermark.',
+    label: 'Export client-ready 1080p',
+    supportingText: 'HD/4K video without a watermark. Choose seven-day access or monthly exports.',
     intent: 'upgrade',
     disabled: false,
   });
@@ -159,7 +157,7 @@ test('free-limit state remains actionable instead of ambiguously disabled', () =
     remainingExports: 0,
   });
 
-  assert.equal(action.label, 'Upgrade to continue');
+  assert.equal(action.label, 'Export client-ready video');
   assert.equal(action.intent, 'upgrade');
   assert.equal(action.disabled, false);
   assert.match(action.supportingText, /all free exports/i);
@@ -210,7 +208,7 @@ test('export summary reflects plan, watermark, and optional estimates', () => {
   assert.equal(getExportSummaryCopy({
     plan: 'free',
     resolution: '4K',
-  }), 'MP4 · 4K · Pro required · No watermark');
+  }), 'MP4 · 4K · Studio required · No watermark');
 
   assert.equal(getExportSummaryCopy({
     plan: 'pro',
@@ -343,7 +341,7 @@ test('unknown diagnostics are mapped to safe copy without exposing backend detai
 test('success-state actions make file download primary while keeping review sharing available', () => {
   assert.deepEqual(getSuccessActions(true), [
     { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
-    { id: 'share', label: 'Create client review link', priority: 'secondary', enabled: true },
+    { id: 'share', label: 'Create approval link', priority: 'secondary', enabled: true },
     { id: 'another', label: 'Export another', priority: 'secondary', enabled: true },
     { id: 'copy', label: 'Copy export details', priority: 'secondary', enabled: true },
   ]);
@@ -359,9 +357,30 @@ test('restore-purchase states distinguish loading, success, not-found, and retry
     canRetry: false,
   });
   assert.equal(getRestoreResultModel('restored').status, 'success');
-  assert.equal(getRestoreResultModel('restored').message, 'Pro restored for this email.');
+  assert.equal(getRestoreResultModel('restored').message, 'Paid access restored for this email.');
   assert.equal(getRestoreResultModel('not-found').canRetry, true);
-  assert.match(getRestoreResultModel('not-found').message, /free allowance is still available/i);
+  assert.match(getRestoreResultModel('not-found').message, /Project Pass or Studio/i);
   assert.equal(getRestoreResultModel('failed').canRetry, true);
   assert.match(getRestoreResultModel('failed').message, /check your connection/i);
+});
+
+test('checkout confirm and paid-access notices distinguish Project Pass from Studio', () => {
+  const {
+    getCheckoutConfirmCopy,
+    getPaidAccessActivatedNotice,
+  } = require('../dist/uiModel.js');
+
+  assert.equal(getCheckoutConfirmCopy('large_export').heading, 'Confirming Project Pass');
+  assert.match(getCheckoutConfirmCopy('large_export').body, /seven days/i);
+  assert.equal(getCheckoutConfirmCopy('monthly').heading, 'Confirming Studio');
+  assert.match(getPaidAccessActivatedNotice('large_export'), /Project Pass is active/i);
+  assert.match(getPaidAccessActivatedNotice('monthly'), /Studio is active/i);
+});
+
+ test('checkout email validation rejects incomplete addresses and accepts trimmed aliases', () => {
+  const { isValidAccountEmail } = require('../dist/uiModel.js');
+  assert.equal(isValidAccountEmail('designer@'), false);
+  assert.equal(isValidAccountEmail('designer@example'), false);
+  assert.equal(isValidAccountEmail('a b@example.com'), false);
+  assert.equal(isValidAccountEmail(' Designer+client@example.com '), true);
 });

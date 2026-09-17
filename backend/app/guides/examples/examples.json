@@ -1,0 +1,86 @@
+[
+  {
+    "slug": "client-delivery",
+    "title": "Figma prototype to MP4 for client delivery",
+    "outcome": "Send a booking flow your client can play without opening Figma.",
+    "project": "Cedar appointment booking",
+    "frames": [
+      {
+        "name": "01 \u2014 Choose a visit",
+        "title": "Choose a visit",
+        "body": "Design consultation \u00b7 30 minutes \u00b7 Tuesday 10:00",
+        "button": "Review booking"
+      },
+      {
+        "name": "02 \u2014 Review your booking",
+        "title": "Review your booking",
+        "body": "Design consultation \u00b7 Tuesday 10:00 \u00b7 Online",
+        "button": "Confirm booking"
+      },
+      {
+        "name": "03 \u2014 Booking confirmed",
+        "title": "Booking confirmed",
+        "body": "Your design consultation is booked.",
+        "button": "Back to overview"
+      }
+    ],
+    "usage": "Ask the client to check the service, time, and confirmation wording.",
+    "honesty": "The clip communicates the proposed booking experience; it does not make a real booking."
+  },
+  {
+    "slug": "saas-walkthrough",
+    "title": "Make a SaaS product walkthrough from Figma",
+    "outcome": "Show how a teammate turns an unassigned task into planned work.",
+    "project": "Orbit task planner",
+    "frames": [
+      {
+        "name": "01 \u2014 Find unassigned work",
+        "title": "Find unassigned work",
+        "body": "Landing page review \u00b7 Unassigned \u00b7 Due Friday",
+        "button": "Assign task"
+      },
+      {
+        "name": "02 \u2014 Assign the next step",
+        "title": "Assign the next step",
+        "body": "Landing page review \u00b7 Assign to Alex \u00b7 Due Friday",
+        "button": "Save assignment"
+      },
+      {
+        "name": "03 \u2014 Ready for this week",
+        "title": "Ready for this week",
+        "body": "Landing page review \u00b7 Alex \u00b7 Planned",
+        "button": "View board"
+      }
+    ],
+    "usage": "Place the clip next to a description of the workflow, with a still-image fallback.",
+    "honesty": "Orbit is a fictional interface. This is a design walkthrough, not a functioning SaaS application."
+  },
+  {
+    "slug": "portfolio-case-study",
+    "title": "Add a Figma prototype video to your portfolio case study",
+    "outcome": "Show the interaction behind a design decision.",
+    "project": "Library search concept",
+    "frames": [
+      {
+        "name": "01 \u2014 Narrow the search",
+        "title": "Narrow the search",
+        "body": "Search: design systems \u00b7 Filter: Available now",
+        "button": "Apply filter"
+      },
+      {
+        "name": "02 \u2014 Inspect the result",
+        "title": "Inspect the result",
+        "body": "Design Systems Handbook \u00b7 Available \u00b7 Digital edition",
+        "button": "Save title"
+      },
+      {
+        "name": "03 \u2014 Save for later",
+        "title": "Save for later",
+        "body": "Saved reading list \u00b7 Design Systems Handbook",
+        "button": "View reading list"
+      }
+    ],
+    "usage": "Pair the clip with your problem statement, role, design rationale, and actual evidence.",
+    "honesty": "This fictional concept illustrates a design decision. It does not demonstrate measured usability improvement."
+  }
+]

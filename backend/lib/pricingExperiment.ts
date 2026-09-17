@@ -4,10 +4,12 @@ import {
   LARGE_FLOW_PASS_DISPLAY,
   PRO_PRICE_MONTHLY_CENTS,
   PRO_PRICE_MONTHLY_DISPLAY,
+  PRO_PRICE_YEARLY_CENTS,
+  PRO_PRICE_YEARLY_DISPLAY,
 } from './plans';
 
 export type BillingPlan = 'monthly' | 'yearly' | 'large_export';
-export type PricingVariantId = 'monthly_5';
+export type PricingVariantId = 'studio_monthly' | 'studio_yearly';
 export type OneTimeOfferId = 'large_flow_pass';
 export type OfferExperimentVariant = 'pro_first' | 'project_pass_first';
 export type PrimaryOffer = 'monthly' | 'large_export';
@@ -18,20 +20,29 @@ export const GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID = 'good_better_best_pricing_
 
 export interface PricingVariant {
   id: PricingVariantId;
-  plan: 'monthly';
+  plan: 'monthly' | 'yearly';
   label: string;
   amountCents: number;
   currency: 'usd';
-  priceEnvVars: readonly ['PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'];
+  priceEnvVars: readonly string[];
 }
 
-export const MONTHLY_PRICE_5: PricingVariant = {
-  id: 'monthly_5',
+export const STUDIO_MONTHLY: PricingVariant = {
+  id: 'studio_monthly',
   plan: 'monthly',
   label: PRO_PRICE_MONTHLY_DISPLAY,
   amountCents: PRO_PRICE_MONTHLY_CENTS,
   currency: 'usd',
-  priceEnvVars: ['PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'],
+  priceEnvVars: ['PROTOVID_STUDIO_MONTHLY_PRICE_ID', 'PROTOVID_MONTHLY_5_PRICE_ID', 'PROTOVID_PRICE_ID'],
+};
+
+export const STUDIO_YEARLY: PricingVariant = {
+  id: 'studio_yearly',
+  plan: 'yearly',
+  label: PRO_PRICE_YEARLY_DISPLAY,
+  amountCents: PRO_PRICE_YEARLY_CENTS,
+  currency: 'usd',
+  priceEnvVars: ['PROTOVID_STUDIO_YEARLY_PRICE_ID'],
 };
 
 export interface OneTimeOffer {
@@ -108,13 +119,12 @@ export function getGoodBetterBestPricingAssignment(
 
 export function getMonthlyPricingVariant(email: string): PricingVariant {
   normalizeEmail(email);
-  return MONTHLY_PRICE_5;
+  return STUDIO_MONTHLY;
 }
 
 export function getPricingVariant(email: string, plan: BillingPlan = 'monthly'): PricingVariant {
   normalizeEmail(email);
-  void plan;
-  return getMonthlyPricingVariant(email);
+  return plan === 'yearly' ? STUDIO_YEARLY : STUDIO_MONTHLY;
 }
 
 export function getPricingVariantForEnvironment(
@@ -137,7 +147,10 @@ export function getPricingVariantWithPriceId(
     .find(Boolean);
 
   if (!priceId) {
-    throw new Error(`${variant.id} billing not configured. Set PROTOVID_MONTHLY_5_PRICE_ID to the Stripe $5/mo price ID.`);
+    const expectedEnv = variant.plan === 'yearly'
+      ? 'PROTOVID_STUDIO_YEARLY_PRICE_ID'
+      : 'PROTOVID_STUDIO_MONTHLY_PRICE_ID';
+    throw new Error(`${variant.id} billing not configured. Set ${expectedEnv} to the matching Stripe price ID.`);
   }
 
   return {

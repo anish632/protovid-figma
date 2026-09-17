@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Email validation schema
-export const emailSchema = z.string()
+export const emailSchema = z.string().trim()
   .min(1, 'Email is required')
   .email('Invalid email format')
   .max(254, 'Email too long') // RFC 5321 limit
@@ -36,6 +36,9 @@ export const eventTypeSchema = z.enum([
   'first_action_completed',
   'first_value_reached',
   'demo_state_shown',
+  'setup_example_selected',
+  'setup_example_created',
+  'setup_guide_opened',
   'email_captured',
   'export_setup_viewed',
   'export_settings_changed',
@@ -49,6 +52,9 @@ export const eventTypeSchema = z.enum([
   'copy_export_details_clicked',
   'resolution_selected',
   'checkout_email_prompt_shown',
+  'checkout_email_submitted',
+  'checkout_email_validation_failed',
+  'checkout_email_abandoned',
   'post_success_email_prompt_shown',
   'post_success_email_save_clicked',
   'post_success_email_dismissed',
@@ -214,7 +220,7 @@ export const checkoutRequestSchema = z.object({
   offerExperimentVariant: z.enum(['pro_first', 'project_pass_first']).optional(),
   primaryOffer: z.enum(['monthly', 'large_export']).optional(),
   pricingPageExperimentId: z.string().min(1).max(64).optional(),
-  pricingPageExperimentVariant: z.enum(['control', 'good_better_best']).optional(),
+  pricingPageExperimentVariant: z.enum(['control', 'good_better_best', 'studio_self_serve']).optional(),
 });
 
 export const pricingVariantRequestSchema = z.object({

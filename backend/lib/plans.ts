@@ -1,3 +1,5 @@
+import { isInBillingGrace, type BillingState } from './billingState';
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt((value || '').trim(), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -5,11 +7,16 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
 
 export const FREE_TIER_EXPORT_LIMIT = parsePositiveInteger(
   process.env.PROTOVID_FREE_EXPORT_LIMIT,
-  3
+  1
 );
+
+export const FREE_TIER_EXPERIMENT_ID =
+  process.env.PROTOVID_FREE_TIER_EXPERIMENT_ID?.trim() || 'one_export_v1';
 
 export const PRO_PRICE_MONTHLY_DISPLAY = '$5/mo';
 export const PRO_PRICE_MONTHLY_CENTS = 500;
+export const PRO_PRICE_YEARLY_DISPLAY = '$50/yr';
+export const PRO_PRICE_YEARLY_CENTS = 5000;
 // Legacy constant names remain because existing Checkout sessions and plugin
 // builds use `large_flow_pass` internally. The offer customers see is the
 // job-based Project Pass.
@@ -26,7 +33,11 @@ export function isPremiumSubscription(input: {
   status: 'active' | 'canceled' | 'past_due' | 'trialing';
   currentPeriodEnd?: string;
   stripeSubscriptionId?: string;
-}): boolean {
+  billingState?: BillingState | null;
+}, now = new Date()): boolean {
+  if (input.status === 'past_due' && input.stripeSubscriptionId
+    && input.billingState?.subscriptionId === input.stripeSubscriptionId
+    && isInBillingGrace(input.billingState, now)) return true;
   // Must be Pro tier and active/trialing status
   if (input.tier !== 'pro' || !['active', 'trialing'].includes(input.status)) {
     return false;
@@ -35,7 +46,6 @@ export function isPremiumSubscription(input: {
   // If it's a manual grant (no Stripe subscription), check expiration
   if (!input.stripeSubscriptionId && input.currentPeriodEnd) {
     const endDate = new Date(input.currentPeriodEnd);
-    const now = new Date();
     return endDate > now; // Only valid if not expired
   }
 

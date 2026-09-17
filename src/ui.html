@@ -245,7 +245,7 @@
 
     .header-upgrade-button {
       display: inline-flex;
-      min-height: 34px;
+      min-height: 40px;
       max-width: 112px;
       align-items: center;
       justify-content: center;
@@ -1365,6 +1365,7 @@
     }
 
     .empty-state {
+      flex-shrink: 0;
       min-height: 0;
       justify-content: flex-start;
       padding: var(--space-3) var(--space-2) var(--space-2);
@@ -1806,7 +1807,7 @@
     .share-native-button {
       justify-content: center;
       gap: 6px;
-      min-height: 34px;
+      min-height: 40px;
       border: 1px dashed #b9c2ee;
       border-radius: var(--radius-control);
       background: transparent;
@@ -2072,7 +2073,22 @@
         animation-iteration-count: 1 !important;
       }
     }
-  </style>
+  .billing-notice { margin: 12px 20px 0; padding: 14px; border: 1px solid #c89238; border-radius: 8px; background: #fff7e6; color: #503509; font-size: 12px; line-height: 1.5; }
+.billing-notice strong { display: block; font-size: 13px; }
+.billing-notice p { margin: 6px 0 10px; }
+.billing-notice button { color: #503509; background: #fff; border: 1px solid #9c741f; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+.example-picker { width: 100%; text-align: left; }
+.example-picker summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.example-picker p { line-height: 1.5; }
+.example-picker button { width: 100%; margin-bottom: 8px; }
+.setup-recommendation { width: 100%; padding: 14px; border: 1px solid #a7d7bd; border-radius: 12px; background: #f2fbf5; text-align: left; }
+.setup-recommendation h2 { margin: 3px 0 6px; font-size: 15px; }
+.setup-recommendation p:not(.section-eyebrow) { margin: 0 0 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.setup-recommendation .primary-action { width: 100%; }
+.connect-your-own-flow { width: 100%; text-align: left; }
+.connect-your-own-flow summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.connect-your-own-flow .secondary-button { width: 100%; }
+</style>
 </head>
 <body>
   <div id="app"></div>

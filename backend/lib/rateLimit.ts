@@ -28,6 +28,11 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 function getClientIdentifier(request: NextRequest): string {
+  const account = request.headers.get('x-user-email')?.trim().toLowerCase();
+  const anonymousId = request.headers.get('x-anonymous-id')?.trim();
+  if (account) return `account:${account.slice(0, 255)}`;
+  if (anonymousId) return `anonymous:${anonymousId.slice(0, 128)}`;
+
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
   const ip = forwarded?.split(',')[0] || realIP || 'unknown';
@@ -37,9 +42,9 @@ function getClientIdentifier(request: NextRequest): string {
   return `${ip}:${userAgent.slice(0, 50)}`; // Truncate user agent
 }
 
-export function createRateLimit(config: RateLimitConfig) {
+export function createRateLimit(config: RateLimitConfig, namespace = 'default') {
   return function rateLimit(request: NextRequest): NextResponse | null {
-    const identifier = getClientIdentifier(request);
+    const identifier = `${namespace}:${getClientIdentifier(request)}`;
     const now = Date.now();
     const record = rateLimitStore.get(identifier);
 
@@ -82,22 +87,27 @@ export function createRateLimit(config: RateLimitConfig) {
 export const generalRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // 100 requests per window
-});
+}, 'general');
 
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes  
   max: 10 // 10 auth attempts per window
-});
+}, 'auth');
 
 export const uploadRateLimit = createRateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5 // 5 uploads per hour
-});
+}, 'upload');
+
+export const mediaRateLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30 // Burst protection without blocking normal paid usage
+}, 'media');
 
 export const statsRateLimit = createRateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 20 // 20 stats requests per window
-});
+}, 'stats');
 
 // Helper to apply rate limiting to API routes
 export function withRateLimit(

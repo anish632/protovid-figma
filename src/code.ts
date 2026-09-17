@@ -1,4 +1,5 @@
 // ProtoVid - Main Plugin Code (runs in Figma sandbox)
+import examples from '../backend/app/guides/examples/examples.json';
 import { FREE_RESOLUTION } from './planConfig';
 import {
   ENTITLEMENT_VERIFICATION_ERROR,
@@ -143,9 +144,9 @@ let currentSettings: ProtoVidExportSettings = {
   showCursor: true
 };
 
-const PLUGIN_VERSION = '1.3.16';
+import { PLUGIN_VERSION } from './version';
 const BACKEND_URL = 'https://protovid.dasgroupllc.com';
-const SETUP_GUIDE_URL = `${BACKEND_URL}/#how-it-works`;
+const SETUP_GUIDE_URL = `${BACKEND_URL}/guides/first-export`;
 const CHECKOUT_SESSION_CONFIG_VERSION = 2;
 const EXPORT_FORMATS = ['mp4', 'webm', 'gif'] as const;
 // These are diagnostics and enumeration safeguards, not export limits. A
@@ -476,6 +477,7 @@ function logEntitlement(entitlement: EntitlementResponse) {
     billingPeriodKey: entitlement.billingPeriodKey,
     subscriptionStatus: entitlement.subscriptionStatus,
     isPaid: entitlement.isPaid,
+    freeTierExperimentId: entitlement.freeTierExperimentId,
     freeExportsLimit: entitlement.freeExportsLimit,
     freeExportsUsed: entitlement.freeExportsUsed,
     freeExportsRemaining: entitlement.freeExportsRemaining,
@@ -557,6 +559,89 @@ figma.showUI(__html__, { width: 400, height: 720, themeColors: true });
 // init message so its analytics listener is ready to receive them.
 loadAnonymousId();
 
+// Top-level frames the designer already drew but has not wired into a prototype.
+// These are the raw material for a one-click "connect and export" so a first
+// export uses the user's real screens instead of a throwaway canned example.
+function getUnconnectedTopLevelFrames(): FrameNode[] {
+  return figma.currentPage.children
+    .filter((node): node is FrameNode => node.type === 'FRAME')
+    .filter(frame => !Array.isArray(frame.reactions) || frame.reactions.length === 0)
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+}
+
+// Wire the designer's existing frames left-to-right so a disconnected page can
+// reach a first export without teaching Figma prototyping. Re-scans afterwards
+// so the normal connected-path flow takes over.
+async function handleConnectExistingFrames() {
+  const frames = getUnconnectedTopLevelFrames();
+  if (frames.length < 2) {
+    trackEvent('setup_autoconnect_skipped', { frameCount: frames.length });
+    await handleScanPrototype();
+    return;
+  }
+  for (let index = 0; index < frames.length - 1; index++) {
+    await frames[index].setReactionsAsync([{
+      trigger: { type: 'ON_CLICK' },
+      actions: [{ type: 'NODE', destinationId: frames[index + 1].id, navigation: 'NAVIGATE',
+        transition: { type: 'DISSOLVE', duration: 0.3, easing: { type: 'EASE_IN_AND_OUT' } }, preserveScrollPosition: false }],
+    }]);
+  }
+  figma.currentPage.selection = [frames[0]];
+  figma.viewport.scrollAndZoomIntoView(frames);
+  trackEvent('setup_frames_autoconnected', { frameCount: frames.length });
+  await handleScanPrototype();
+}
+
+// Explicitly requested from the empty state; keep the user's existing page intact.
+async function handleCreateExamplePrototype(slug?: string, source = 'example_picker') {
+  const example = examples.find(item => item.slug === slug) || examples[0];
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  const page = figma.createPage();
+  page.name = `ProtoVid — ${example.project}`;
+  await figma.setCurrentPageAsync(page);
+  const frames = example.frames.map((screen, index) => {
+    const frame = figma.createFrame();
+    frame.name = screen.name;
+    frame.resize(1280, 720);
+    frame.x = index * 1400;
+    frame.fills = [{ type: 'SOLID', color: { r: 0.05, g: 0.09, b: 0.08 } }];
+    const title = figma.createText();
+    title.fontName = { family: 'Inter', style: 'Regular' };
+    title.characters = screen.title;
+    title.fontSize = 48;
+    title.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.96, b: 0.92 } }];
+    frame.appendChild(title);
+    title.x = 64; title.y = 168;
+    const body = figma.createText();
+    body.fontName = { family: 'Inter', style: 'Regular' };
+    body.characters = screen.body;
+    body.fontSize = 28;
+    body.fills = [{ type: 'SOLID', color: { r: 0.65, g: 0.8, b: 0.7 } }];
+    frame.appendChild(body);
+    body.x = 64; body.y = 252;
+    const button = figma.createRectangle();
+    button.name = screen.button; button.resize(360, 64); button.cornerRadius = 8;
+    button.fills = [{ type: 'SOLID', color: { r: 0.25, g: 0.8, b: 0.5 } }];
+    frame.appendChild(button); button.x = 64; button.y = 520;
+    const caption = figma.createText();
+    caption.fontName = { family: 'Inter', style: 'Regular' };
+    caption.characters = screen.button; caption.fontSize = 24;
+    frame.appendChild(caption); caption.x = 84; caption.y = 536;
+    return frame;
+  });
+  for (let index = 0; index < frames.length - 1; index++) {
+    await frames[index].setReactionsAsync([{
+      trigger: { type: 'ON_CLICK' },
+      actions: [{ type: 'NODE', destinationId: frames[index + 1].id, navigation: 'NAVIGATE',
+        transition: { type: 'DISSOLVE', duration: 0.3, easing: { type: 'EASE_IN_AND_OUT' } }, preserveScrollPosition: false }],
+    }]);
+  }
+  page.selection = [frames[0]];
+  figma.viewport.scrollAndZoomIntoView(frames);
+  trackEvent('setup_example_created', { source, example: example.slug, frameCount: frames.length });
+  await handleScanPrototype();
+}
+
 // Message handler
 figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
   try {
@@ -567,6 +652,14 @@ figma.ui.onmessage = async (msg: { type: string; data?: any }) => {
 
       case 'scan-prototype':
         await handleScanPrototype();
+        break;
+
+      case 'create-example-prototype':
+        await handleCreateExamplePrototype(msg.data?.slug, msg.data?.source);
+        break;
+
+      case 'connect-existing-frames':
+        await handleConnectExistingFrames();
         break;
 
       case 'open-setup-guide':
@@ -803,6 +896,7 @@ async function handleInit() {
     data: {
       hasPrototype,
       frameCount: detectedFrameCount,
+      unconnectedFrameCount: hasPrototype ? 0 : getUnconnectedTopLevelFrames().length,
       paths: pathCatalog.paths,
       pathSelectionRequired: pathCatalog.pathSelectionRequired,
       defaultPathId: pathCatalog.defaultPathId,
@@ -881,6 +975,7 @@ async function handleScanPrototype() {
     data: {
       frames,
       flow,
+      unconnectedFrameCount: frames.length > 0 ? 0 : getUnconnectedTopLevelFrames().length,
       paths: pathCatalog.paths,
       pathSelectionRequired: pathCatalog.pathSelectionRequired,
       defaultPathId: pathCatalog.defaultPathId,
@@ -982,6 +1077,8 @@ async function handleExportVideo(settings: ProtoVidExportSettings) {
     pathFrameCount: selectedPath.frameCount,
     selectionSource,
     first_export: currentExportIsFirst,
+    freeLimit: currentEntitlement?.freeExportsLimit ?? null,
+    free_tier_experiment_id: currentEntitlement?.freeTierExperimentId ?? null,
   });
   trackEvent('export', {
     attempt_id: exportAttemptId,
@@ -1017,6 +1114,7 @@ async function handleExportVideo(settings: ProtoVidExportSettings) {
         reason,
         exportCount: entitlement.freeExportsUsed,
         freeLimit: entitlement.freeExportsLimit,
+        free_tier_experiment_id: entitlement.freeTierExperimentId ?? null,
         daysSinceFirstExport
       });
       trackEvent('paywall_viewed', {
@@ -1024,6 +1122,7 @@ async function handleExportVideo(settings: ProtoVidExportSettings) {
         trigger: 'free_limit_reached',
         exportCount: entitlement.freeExportsUsed,
         freeLimit: entitlement.freeExportsLimit,
+        free_tier_experiment_id: entitlement.freeTierExperimentId ?? null,
         daysSinceFirstExport
       });
       figma.ui.postMessage({
@@ -1047,7 +1146,7 @@ async function handleExportVideo(settings: ProtoVidExportSettings) {
       });
       figma.ui.postMessage({
         type: 'error',
-        data: { message: 'HD/4K export requires Pro. Please upgrade or select 720p.' }
+        data: { message: 'HD/4K export requires Studio or Project Pass. Please upgrade or select 720p.' }
       });
       finishWithoutEncoding();
       return;
@@ -1159,7 +1258,7 @@ async function handleOpenCheckout(email: string, plan?: string, pricingMetadata:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email,
+        email: normalizedEmail,
         plan: selectedPlan,
         anonymousId: anonymousIdForCheckout,
         offerExperimentId: pricingMetadata.offerExperimentId,
@@ -1235,7 +1334,7 @@ async function handleOpenCheckout(email: string, plan?: string, pricingMetadata:
             type: 'license-validated',
             data: { isValid: true, licenseKey: email, entitlement }
           });
-          figma.notify('Your existing Pro access has been restored.');
+          figma.notify('Your existing Studio access has been restored.');
           return;
         }
       }
@@ -1291,13 +1390,8 @@ async function handleResumeCheckout(url?: string, email?: string, plan?: string)
 async function handleOpenBillingPortal() {
   try {
     const email = await loadEmail();
-    if (!email) {
-      figma.notify('No account found. Please contact support.');
-      return;
-    }
-
     const capability = await loadBillingManagementCapability();
-    if (capability?.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+    if (email && capability?.email.toLowerCase().trim() === email.toLowerCase().trim()) {
       const response = await fetch(`${BACKEND_URL}/api/billing/portal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1317,30 +1411,10 @@ async function handleOpenBillingPortal() {
       await clearBillingManagementCapability();
     }
 
-    // Existing users and web-originated purchases may not have a Checkout
-    // session stored in this Figma installation. Requesting a signed link to
-    // the recorded mailbox preserves account ownership; it never returns a
-    // portal URL to someone who merely knows an email address.
-    const linkResponse = await fetch(`${BACKEND_URL}/api/billing/management-link`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const linkData = await linkResponse.json().catch(() => ({}));
-    if (linkResponse.ok) {
-      figma.notify(
-        linkData.message || 'If a recurring ProtoVid subscription uses this email, we sent a secure management link.'
-      );
-      return;
-    }
-
-    if (linkResponse.status === 503) {
-      const supportEmail = typeof linkData.supportEmail === 'string' ? ` Contact ${linkData.supportEmail}.` : '';
-      figma.notify(`Secure account recovery is not available yet.${supportEmail}`);
-      return;
-    }
-
-    figma.notify('Could not start secure billing management. Please try again or contact support.');
+    // Stripe's hosted login page verifies mailbox ownership and works for
+    // purchases made on any device without support or manual provisioning.
+    figma.openExternal(`${BACKEND_URL}/account`);
+    figma.notify('Opening secure Stripe billing management.');
   } catch (error) {
     console.error('Portal error:', error);
     figma.notify('Network error. Please try again.');

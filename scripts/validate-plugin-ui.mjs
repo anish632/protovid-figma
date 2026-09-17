@@ -62,6 +62,14 @@ const cdp = new CdpClient(target.webSocketDebuggerUrl);
 await cdp.connect();
 await cdp.send('Page.enable');
 await cdp.send('Runtime.enable');
+await cdp.send('Network.enable');
+await cdp.send('Network.setBlockedURLs', { urls: ['https://protovid.dasgroupllc.com/*'] });
+const analytics = [];
+cdp.events.set('Network.requestWillBeSent', [event => {
+  if (event.request.url.endsWith('/api/track') && event.request.postData) {
+    try { analytics.push(JSON.parse(event.request.postData)); } catch {}
+  }
+}]);
 await cdp.send('Browser.setDownloadBehavior', {
   behavior: 'allow',
   downloadPath: '/tmp/protovid-ui-downloads',
@@ -283,22 +291,22 @@ assert(focusRing.outlineStyle === 'solid' && focusRing.outlineWidth >= 2, `Visib
 
 await navigate('state=progress&frames=8', 'Creating your MP4', 400, 700);
 let text = await pluginText();
-assert(text.includes('Preparing frames') && text.includes('Rendering transitions') && text.includes('Encoding MP4') && text.includes('Finalizing download'), 'Progress screen is missing named stages');
+assert(text.includes('Preparing frames') && text.includes('Rendering transitions') && text.includes('Encoding file') && text.includes('Finalizing download'), 'Progress screen is missing named stages');
 assert(text.includes('8 frames') && text.includes('720p'), 'Progress screen is missing export facts');
 screenshots.push(await screenshot('400x700-progress'));
 
 await navigate('state=success&frames=3', 'Your MP4 is ready', 400, 700);
 text = await pluginText();
-assert(text.includes('Download MP4'), 'Success screen is missing its primary download action');
-assert(text.indexOf('Download MP4') < text.indexOf('Ready to ship this project?'), 'Upgrade appears before the download action');
+assert(text.includes('Download file'), 'Success screen is missing its primary download action');
+assert(text.indexOf('Download file') < text.indexOf('Ready to ship this project?'), 'Upgrade appears before the download action');
 assert(text.includes('Copy export details') && text.includes('Export another'), 'Success actions are incomplete');
 screenshots.push(await screenshot('400x700-success'));
 
 await navigate('state=detected&frames=3', 'Export free proof');
 await clickText('1080p');
-await waitForText('Upgrade for 1080p');
+await waitForText('Buy Project Pass');
 text = await pluginText();
-assert(!text.includes('Email address'), 'Selecting a Pro resolution forced checkout/email capture');
+assert(!text.includes('Email address'), 'Selecting a Studio resolution forced checkout/email capture');
 await clickText('720p');
 await waitForText('Export free proof');
 await evaluate(`(() => {
@@ -334,9 +342,9 @@ await clickText('Restore purchase');
 await waitForText('Email address');
 await fillEmail('designer@example.com');
 await clickText('Restore purchase');
-await waitForText('Pro restored for this email.');
+await waitForText('Paid access restored for this email.');
 text = await pluginText();
-assert(text.includes('Unlimited exports included'), 'Restore did not expose active Pro allowance');
+assert(text.includes('Unlimited exports included'), 'Restore did not expose active Studio allowance');
 
 await navigate('state=detected&frames=3&restoreOutcome=failure', 'Export free proof');
 await clickText('Account', 'summary');
@@ -344,18 +352,31 @@ await clickText('Restore purchase');
 await waitForText('Email address');
 await fillEmail('designer@example.com');
 await clickText('Restore purchase');
-await waitForText('No active Pro plan was found');
+await waitForText('No active Project Pass or Studio purchase was found');
 text = await pluginText();
 assert(text.includes('Email address'), 'Failed restore should keep the email capture visible');
 
 await navigate('state=success&frames=5', 'Ready to ship this project?');
-await clickText('Re-export clean in HD');
+await clickText('Buy Project Pass —');
 await waitForText('Email address');
+assert(!(await pluginText()).includes('Buy Project Pass —'), 'Competing offers remain visible during checkout');
+assert((await pluginText()).includes('No subscription.'), 'Pass terms missing from email step');
+await clickText('Back to plans');
+await waitForText('Buy Project Pass —');
+await clickText('Buy Project Pass —');
+await waitForText('Email address');
+const upgradesBeforeSubmit = analytics.filter(event => event.eventType === 'upgrade_clicked').length;
+await fillEmail('client@');
+assert(await evaluate(`${pluginDocumentExpression()}.querySelector('.email-capture .upgrade-cta').disabled`), 'Incomplete email can start checkout');
 await fillEmail('client@example.com');
-await clickText('Continue —');
-await waitForText('Pro is active.');
+await evaluate(`(() => { const button = ${pluginDocumentExpression()}.querySelector('.email-capture .upgrade-cta'); button.click(); button.click(); })()`);
+await waitForText('Studio is active.');
+assert(await evaluate('window.__harnessStats.checkoutRequests') === 1, 'Double click created duplicate checkouts');
+assert(analytics.filter(event => event.eventType === 'upgrade_clicked').length === upgradesBeforeSubmit, 'Email submission inflated upgrade clicks');
+assert(analytics.some(event => event.eventType === 'checkout_email_submitted'), 'Email submission was not tracked');
+assert(analytics.filter(event => event.eventType === 'checkout_email_submitted').every(event => event.pluginVersion === '1.3.24'), 'Checkout UI events report the wrong release');
 text = await pluginText();
-assert(text.includes('Export client-ready MP4'), 'Checkout success did not return to a Pro export setup');
+assert(text.includes('Export client-ready video'), 'Checkout success did not return to a Studio export setup: '+text);
 
 await navigate('state=detected&frames=3&exportOutcome=failure', 'Export free proof');
 await clickText('Export free proof');
@@ -366,7 +387,7 @@ assert(!text.includes('hidden backend details'), 'Raw diagnostic details leaked 
 assert(text.includes('720p'), 'Selected settings were not preserved after failure');
 screenshots.push(await screenshot('400x700-failure'));
 
-await navigate('state=limit&frames=3', 'Upgrade to continue');
+await navigate('state=limit&frames=3', 'Buy Project Pass');
 const limitActionEnabled = await evaluate(`!${pluginDocumentExpression()}.querySelector('.sticky-action-bar .primary-action').disabled`);
 assert(limitActionEnabled, 'Free-limit action is ambiguously disabled');
 screenshots.push(await screenshot('400x700-limit'));
@@ -403,7 +424,7 @@ await navigate('state=checkout-opening&frames=3', 'Opening secure checkout in yo
 const openingActionDisabled = await evaluate(`${pluginDocumentExpression()}.querySelector('.sticky-action-bar .primary-action').disabled`);
 assert(openingActionDisabled, 'Checkout opening state allows a duplicate primary action');
 
-await navigate('state=checkout-pending&frames=3', 'Confirming Pro');
+await navigate('state=checkout-pending&frames=3', 'Confirming Studio');
 text = await pluginText();
 assert(text.includes('Back to export setup'), 'Pending checkout is missing a safe return action');
 
@@ -422,19 +443,29 @@ await clickText('Use another email');
 await waitForText('Use another email');
 await fillEmail('new-account@example.com');
 await clickText('Use this email');
-await waitForText('Account switched. Pro is active.');
+await waitForText('Account switched. Studio is active.');
 
-await navigate('state=pro&frames=3', 'Export client-ready MP4');
+await navigate('state=pro&frames=3', 'Export client-ready video');
 await clickText('4K');
 await waitForText('4K without a watermark');
 
 await navigate('state=mixed&frames=4', 'Frame dimensions vary');
 await navigate('state=one-frame', 'Only one frame is connected');
 await navigate('state=empty', 'No connected prototype flow found');
+assert(await evaluate(`(() => { const doc = ${pluginDocumentExpression()}; return doc.querySelector('.empty-state').getBoundingClientRect().bottom <= doc.querySelector('.empty-screen-wrap > .account-menu').getBoundingClientRect().top; })()`), 'Empty-state controls overlap the account menu');
 screenshots.push(await screenshot('400x700-empty'));
+for (const [slug, label] of [['client-delivery', 'Client booking walkthrough'], ['saas-walkthrough', 'SaaS task-planning demo'], ['portfolio-case-study', 'Portfolio interaction']]) {
+  await navigate('state=empty', 'No connected prototype flow found');
+  assert(await evaluate(`${pluginDocumentExpression()}.querySelector('.example-picker').open`), 'Ready-connected examples are hidden');
+  await clickText(label);
+  await waitForText('Detected flow');
+  assert(await evaluate(`window.__harnessStats.exampleSlug === ${JSON.stringify(slug)}`), 'Wrong example requested');
+  assert(await evaluate('window.__harnessStats.exportRequests === 0'), 'Example creation must not consume an export');
+}
 
-await navigate('state=success&frames=3', 'Download MP4');
-await clickText('Download MP4', 'a');
+
+await navigate('state=success&frames=3', 'Download file');
+await clickText('Download file', 'a');
 
 console.log(JSON.stringify({
   passed: true,
@@ -442,7 +473,7 @@ console.log(JSON.stringify({
   screenshots,
   journeys: [
     'detect and configure',
-    'Pro resolution explanation',
+    'Studio resolution explanation',
     'free export and download',
     'copy details and export another',
     'restore purchase',
@@ -457,7 +488,7 @@ console.log(JSON.stringify({
     'checkout opening, pending, cancelled, and error',
     'account switching',
     'keyboard focus order and visibility',
-    'Pro 4K',
+    'Studio 4K',
     'mixed dimensions',
     'single frame',
     'empty flow',

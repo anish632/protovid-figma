@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { neon } from '@neondatabase/serverless';
-import { getRefundedAmountCents, summarizeChargeRevenue } from '@/lib/revenue';
+import { getRefundedAmountCents, summarizeChargeRevenue, subscriptionMonthlyRevenueCents } from '@/lib/revenue';
 
 function getDB() {
   if (!process.env.NEON_DATABASE_URL) {
@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
       dbEvents,
       recentEvents
     ] = await Promise.all([
-      stripe.customers.list({ limit: 100 }),
-      stripe.subscriptions.list({ status: 'all', limit: 100 }),
+      stripe.customers.list({ limit: 100 }).autoPagingToArray({ limit: 100_000 }),
+      stripe.subscriptions.list({ status: 'all', limit: 100 }).autoPagingToArray({ limit: 100_000 }),
       // Revenue is an all-time metric. Auto-pagination prevents the 101st
       // charge from silently disappearing from the calculation.
       stripe.charges.list({ limit: 100 }).autoPagingToArray({ limit: 10_000 }),
-      stripe.invoices.list({ limit: 100 }),
+      stripe.invoices.list({ limit: 100 }).autoPagingToArray({ limit: 100_000 }),
       sql`SELECT COUNT(*) as count FROM protovid_subscriptions`,
       sql`SELECT COUNT(*) as count FROM protovid_events WHERE event_type = 'payment_confirmed'`,
       sql`
@@ -71,24 +71,10 @@ export async function GET(request: NextRequest) {
       `
     ]);
 
-    // Calculate MRR
-    const activeSubs = subscriptions.data.filter(
-      sub => sub.status === 'active' || sub.status === 'trialing'
-    );
-    
-    let mrr = 0;
-    let activeCount = 0;
-    let trialingCount = 0;
-    
-    for (const sub of activeSubs) {
-      const price = sub.items.data[0]?.price;
-      if (price && price.unit_amount) {
-        const amount = price.unit_amount / 100;
-        mrr += amount;
-        if (sub.status === 'active') activeCount++;
-        if (sub.status === 'trialing') trialingCount++;
-      }
-    }
+    // Normalize all recurring items; trials are access, not paid MRR.
+    const mrr = subscriptions.reduce((sum, sub) => sum + subscriptionMonthlyRevenueCents(sub), 0) / 100;
+    const activeCount = subscriptions.filter(sub => sub.status === 'active').length;
+    const trialingCount = subscriptions.filter(sub => sub.status === 'trialing').length;
 
     // A refunded Stripe charge still has its original `amount`. Start from
     // every paid charge and subtract `amount_refunded` exactly once; filtering
@@ -115,11 +101,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       summary: {
         // Customer metrics
-        totalCustomers: customers.data.length,
-        totalSubscriptions: subscriptions.data.length,
+        totalCustomers: customers.length,
+        totalSubscriptions: subscriptions.length,
         activeSubscriptions: activeCount,
         trialSubscriptions: trialingCount,
-        canceledSubscriptions: subscriptions.data.filter(s => s.status === 'canceled').length,
+        canceledSubscriptions: subscriptions.filter(s => s.status === 'canceled').length,
         
         // Revenue metrics
         mrr: mrr,
@@ -145,16 +131,16 @@ export async function GET(request: NextRequest) {
         totalCharges: charges.length,
         
         // Invoices
-        totalInvoices: invoices.data.length,
-        paidInvoices: invoices.data.filter(i => (i as any).paid).length,
+        totalInvoices: invoices.length,
+        paidInvoices: invoices.filter(i => i.status === 'paid').length,
       },
-      customers: customers.data.map(c => ({
+      customers: customers.map(c => ({
         id: c.id,
         email: c.email,
         name: c.name,
         created: c.created,
       })),
-      subscriptions: subscriptions.data.map((s: any) => ({
+      subscriptions: subscriptions.map((s: any) => ({
         id: s.id,
         customer: s.customer,
         status: s.status,

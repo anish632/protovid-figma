@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { FREE_TIER_EXPORT_LIMIT } from '@/lib/plans';
+import { FREE_TIER_EXPERIMENT_ID, FREE_TIER_EXPORT_LIMIT } from '@/lib/plans';
 
 // Lazy initialize DB connection
 function getDB() {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const sql = getDB();
     // Check API key
     const apiKey = request.headers.get('x-api-key') || request.nextUrl.searchParams.get('key');
-    if (apiKey !== STATS_API_KEY) {
+    if (!STATS_API_KEY || apiKey !== STATS_API_KEY) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -230,7 +230,10 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT actor_id) FILTER (WHERE monetization_surface = 'legacy_ambiguous') as legacy_ambiguous_paywall_viewed_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'paywall_viewed') as raw_paywall_viewed_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'upgrade_clicked') as upgrade_clicked_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_email_submitted') as checkout_email_submitted_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_error') as checkout_error_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_email_prompt_shown') as checkout_email_prompt_shown_users,
+        COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_email_abandoned') as checkout_email_abandoned_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'pricing_variant_assigned') as pricing_variant_assigned_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_start') as checkout_start_users,
         COUNT(DISTINCT actor_id) FILTER (WHERE event_type = 'checkout_created') as checkout_created_users,
@@ -487,7 +490,10 @@ export async function GET(request: NextRequest) {
         // the correctly classified quota wall, not all raw paywall events.
         paywallViewedUsers: parseInt(funnelSummary.quota_paywall_viewed_users || '0'),
         upgradeClickedUsers: parseInt(funnelSummary.upgrade_clicked_users || '0'),
+        checkoutEmailSubmittedUsers: parseInt(funnelSummary.checkout_email_submitted_users || '0'),
+        checkoutErrorUsers: parseInt(funnelSummary.checkout_error_users || '0'),
         checkoutEmailPromptShownUsers: parseInt(funnelSummary.checkout_email_prompt_shown_users || '0'),
+        checkoutEmailAbandonedUsers: parseInt(funnelSummary.checkout_email_abandoned_users || '0'),
         pricingVariantAssignedUsers: parseInt(funnelSummary.pricing_variant_assigned_users || '0'),
         checkoutStartUsers: parseInt(funnelSummary.checkout_start_users || '0'),
         checkoutCreatedUsers: parseInt(funnelSummary.checkout_created_users || '0'),
@@ -565,6 +571,7 @@ export async function GET(request: NextRequest) {
         })),
       },
       freeTier30d: {
+        experimentId: FREE_TIER_EXPERIMENT_ID,
         freeLimit: FREE_TIER_EXPORT_LIMIT,
         trackedFreeUsersThisMonth: parseInt(freeTierPressure.tracked_free_users_this_month || '0'),
         trackedFreeExportsThisMonth: parseInt(freeTierPressure.tracked_free_exports_this_month || '0'),

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Activate Free ProtoVid Pro</title>
+      <title>Activate Free ProtoVid Studio</title>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
@@ -85,12 +85,12 @@ export async function GET(request: NextRequest) {
     </head>
     <body>
       <div class="card">
-        <h1>🎉 Activate Your Free ProtoVid Pro</h1>
+        <h1>Activate Your Free ProtoVid Studio</h1>
         
         <p>Hi Iva! Thank you for your valuable feedback that helped improve ProtoVid for everyone.</p>
         
         <div class="details">
-          <strong>Your Free Pro Offer:</strong><br>
+          <strong>Your Free Studio Offer:</strong><br>
           📧 Email: ${offer.email}<br>
           ⏱️ Duration: ${offer.months} months<br>
           📅 Expires: September 9, 2026<br>
@@ -106,14 +106,14 @@ export async function GET(request: NextRequest) {
         </ul>
         
         <button class="btn" onclick="activatePro()">
-          Activate 3 Months Free Pro Access
+          Activate 3 Months Free Studio Access
         </button>
         
         <div id="result"></div>
         
         <p class="small">
-          <strong>How it works:</strong> Click the button above to activate Pro features for your email (${offer.email}). 
-          Open the ProtoVid plugin in Figma and you'll immediately see "Pro - Client-ready exports, no watermark" in the interface.
+          <strong>How it works:</strong> Click the button above to activate Studio features for your email (${offer.email}).
+          Open the ProtoVid plugin in Figma and you'll immediately see "Studio active" in the interface.
         </p>
         
         <p class="small">
@@ -142,11 +142,11 @@ export async function GET(request: NextRequest) {
             if (data.success) {
               result.innerHTML = \`
                 <div class="success">
-                  🎉 Success! Your Pro access is now active.
+                  Success! Your Studio access is now active.
                   <div class="details">
                     <strong>Activated:</strong> ${offer.email}<br>
                     <strong>Expires:</strong> \${data.endDate}<br>
-                    <strong>Status:</strong> Pro tier active
+                    <strong>Status:</strong> Studio access active
                   </div>
                   <p>Open the ProtoVid plugin in Figma to start creating professional prototype videos!</p>
                 </div>
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${offer.months} months free Pro access activated for ${offer.email}`,
+      message: `${offer.months} months free Studio access activated for ${offer.email}`,
       email: offer.email,
       endDate: endDate.toISOString().slice(0, 10),
       previousStatus: { tier: previousTier, status: previousStatus },
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Self-service activation error:', error);
     return NextResponse.json({ 
-      error: 'Failed to activate Pro access',
+      error: 'Failed to activate Studio access',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }

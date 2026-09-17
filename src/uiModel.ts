@@ -1,3 +1,7 @@
+export function isValidAccountEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export const RESOLUTIONS = ['720p', '1080p', '4K'] as const;
 export const EXPORT_FORMATS = ['mp4', 'webm', 'gif'] as const;
 
@@ -37,14 +41,10 @@ export function getExperimentPrimaryPlan(
     : 'monthly';
 }
 
-/** Stable 50/50 assignment for the share distribution experiment. */
+/** Ship the reviewer invitation loop to every completed approval link. */
 export function getShareExperimentVariant(anonymousId: string | null): ShareExperimentVariant {
-  const seed = anonymousId || 'protovid-fallback-seed';
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
-  }
-  return hash % 2 === 0 ? 'control' : 'invite_panel';
+  void anonymousId;
+  return 'invite_panel';
 }
 
 export type VoiceCommand =
@@ -123,7 +123,7 @@ export interface ResolutionOptionModel {
   value: Resolution;
   label: Resolution;
   availability: 'included' | 'requires-pro';
-  badge: 'Pro' | null;
+  badge: 'Studio' | null;
   isSelectable: true;
   helperText: string;
 }
@@ -140,7 +140,7 @@ function isProResolution(resolution: Resolution): boolean {
 }
 
 /**
- * Resolution choices remain selectable so Free users can understand the Pro
+ * Resolution choices remain selectable so Free users can understand the Studio
  * benefit before deciding whether to upgrade. Availability controls export,
  * rather than making a visually ambiguous disabled tile.
  */
@@ -152,10 +152,10 @@ export function getResolutionOptions(plan: PlanTier): ResolutionOptionModel[] {
       value: resolution,
       label: resolution,
       availability: requiresUpgrade ? 'requires-pro' : 'included',
-      badge: requiresUpgrade ? 'Pro' : null,
+      badge: requiresUpgrade ? 'Studio' : null,
       isSelectable: true,
       helperText: requiresUpgrade
-        ? 'Upgrade for HD or 4K without the watermark.'
+        ? 'Project Pass or Studio unlocks HD or 4K without the watermark.'
         : resolution === '720p'
           ? 'Optimized for quick review.'
           : 'Client-ready quality without a watermark.',
@@ -174,7 +174,7 @@ export function getResolutionSelection(
     canExport: !requiresUpgrade,
     requiresUpgrade,
     message: requiresUpgrade
-      ? `${resolution} is available with Pro for a clean, client-ready export.`
+      ? `${resolution} is available with Project Pass or Studio for a clean, client-ready export.`
       : null,
   };
 }
@@ -262,7 +262,7 @@ export function getPrimaryActionModel({
 
   if (plan === 'free' && normalizeRemainingExports(remainingExports ?? 0) === 0) {
     return {
-      label: 'Upgrade to continue',
+      label: 'Export client-ready video',
       supportingText: 'You’ve used all free exports this month.',
       intent: 'upgrade',
       disabled: false,
@@ -272,8 +272,8 @@ export function getPrimaryActionModel({
   const resolutionSelection = getResolutionSelection(resolution, plan);
   if (resolutionSelection.requiresUpgrade) {
     return {
-      label: `Upgrade for ${resolution}`,
-      supportingText: 'Export in HD or 4K without the watermark.',
+      label: `Export client-ready ${resolution}`,
+      supportingText: 'HD/4K video without a watermark. Choose seven-day access or monthly exports.',
       intent: 'upgrade',
       disabled: false,
     };
@@ -314,7 +314,7 @@ export function getExportSummaryCopy({
   const formatLabel = format.toUpperCase();
   const requiresUpgrade = getResolutionSelection(resolution, plan).requiresUpgrade;
   const summary = requiresUpgrade
-    ? [formatLabel, resolution, 'Pro required', 'No watermark']
+    ? [formatLabel, resolution, 'Studio required', 'No watermark']
     : plan === 'pro'
       ? [formatLabel, resolution, 'Client-ready', 'No watermark']
       : [formatLabel, '720p', 'Free proof', 'Watermark included'];
@@ -326,7 +326,7 @@ export function getExportSummaryCopy({
 
 export const SUCCESS_ACTIONS = [
   { id: 'download', label: 'Download file', priority: 'primary' },
-  { id: 'share', label: 'Create client review link', priority: 'secondary' },
+  { id: 'share', label: 'Create approval link', priority: 'secondary' },
   { id: 'another', label: 'Export another', priority: 'secondary' },
   { id: 'copy', label: 'Copy export details', priority: 'secondary' },
 ] as const;
@@ -349,12 +349,12 @@ export function getRestoreResultModel(result: RestoreResult): {
     return { status: 'loading', message: 'Checking for an active purchase…', canRetry: false };
   }
   if (result === 'restored') {
-    return { status: 'success', message: 'Pro restored for this email.', canRetry: false };
+    return { status: 'success', message: 'Paid access restored for this email.', canRetry: false };
   }
   if (result === 'not-found') {
     return {
       status: 'error',
-      message: 'No active Pro plan was found for that email. Your free allowance is still available.',
+      message: 'No active Project Pass or Studio purchase was found for that email. Your free allowance is still available.',
       canRetry: true,
     };
   }
@@ -363,6 +363,29 @@ export function getRestoreResultModel(result: RestoreResult): {
     message: 'Purchase could not be restored. Check your connection and try again.',
     canRetry: true,
   };
+}
+
+export function getCheckoutConfirmCopy(plan: PaidOfferPlan | ''): {
+  heading: string;
+  body: string;
+} {
+  if (plan === 'large_export') {
+    return {
+      heading: 'Confirming Project Pass',
+      body: 'Complete checkout in your browser. ProtoVid will unlock seven days of clean exports automatically.',
+    };
+  }
+  return {
+    heading: 'Confirming Studio',
+    body: 'Complete checkout in your browser. ProtoVid will detect access automatically.',
+  };
+}
+
+export function getPaidAccessActivatedNotice(plan: PaidOfferPlan | ''): string {
+  if (plan === 'large_export') {
+    return 'Project Pass is active. Export this flow in HD or 4K without a watermark.';
+  }
+  return 'Studio is active. Client-ready resolutions are now available.';
 }
 
 export const EXPORT_PROGRESS_STAGES = [

@@ -1,5 +1,16 @@
 import Stripe from 'stripe';
 
+export function assertCheckoutPrice(price: {
+  active: boolean; currency: string; unit_amount: number | null;
+  recurring?: { interval: string; interval_count: number } | null;
+}, expected: { amountCents: number; interval: 'month' | 'year' | null }) {
+  if (!price.active || price.currency !== 'usd' || price.unit_amount !== expected.amountCents
+    || (expected.interval === null ? Boolean(price.recurring)
+      : price.recurring?.interval !== expected.interval || price.recurring?.interval_count !== 1)) {
+    throw new Error('Checkout price configuration does not match the displayed offer');
+  }
+}
+
 export function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) throw new Error('STRIPE_SECRET_KEY not configured');
@@ -16,8 +27,12 @@ export async function createCheckoutSession(params: {
   mode?: 'subscription' | 'payment';
   metadata?: Record<string, string>;
   trialDays?: number;
+  expectedPrice?: { amountCents: number; interval: 'month' | 'year' | null };
 }) {
   const stripe = getStripe();
+  if (params.expectedPrice) {
+    assertCheckoutPrice(await stripe.prices.retrieve(params.priceId), params.expectedPrice);
+  }
   const sessionParams = buildCheckoutSessionParams(params);
   const session = await stripe.checkout.sessions.create(sessionParams);
   if (!session.url) {
@@ -49,12 +64,12 @@ export function buildCheckoutSessionParams(params: {
       },
     ],
     mode,
+    customer_email: params.customerEmail,
+    allow_promotion_codes: true,
+    billing_address_collection: 'auto',
+    tax_id_collection: { enabled: true },
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
-    payment_method_types: ['card'],
-    wallet_options: {
-      link: { display: 'never' },
-    },
     metadata: {
       email: params.customerEmail,
       trial_days: String(params.trialDays || 0),
@@ -62,11 +77,17 @@ export function buildCheckoutSessionParams(params: {
     },
   };
 
-  // Add trial period if specified
-  if (mode === 'subscription' && params.trialDays && params.trialDays > 0) {
+  if (mode === 'subscription') {
     sessionParams.subscription_data = {
-      trial_period_days: params.trialDays,
+      metadata: sessionParams.metadata,
+      ...(params.trialDays && params.trialDays > 0
+        ? { trial_period_days: params.trialDays }
+        : {}),
     };
+  }
+
+  if (mode === 'payment') {
+    sessionParams.customer_creation = 'always';
   }
 
   return sessionParams;
@@ -77,6 +98,7 @@ export async function createPortalSession(customerId: string, returnUrl: string)
   
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
+    configuration: process.env.STRIPE_CUSTOMER_PORTAL_CONFIGURATION_ID?.trim() || undefined,
     return_url: returnUrl,
   });
 

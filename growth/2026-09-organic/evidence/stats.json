@@ -1,0 +1,757 @@
+{
+  "totalEvents": 19603,
+  "eventsByType": [
+    {
+      "type": "pricing_variant_assigned",
+      "count": 1114,
+      "users": 328,
+      "anonymousCount": 1069
+    },
+    {
+      "type": "flow_detection_started",
+      "count": 706,
+      "users": 300,
+      "anonymousCount": 692
+    },
+    {
+      "type": "prototype_detected",
+      "count": 470,
+      "users": 231,
+      "anonymousCount": 456
+    },
+    {
+      "type": "prototype_frames_detected",
+      "count": 466,
+      "users": 228,
+      "anonymousCount": 453
+    },
+    {
+      "type": "flow_detected",
+      "count": 464,
+      "users": 72,
+      "anonymousCount": 464
+    },
+    {
+      "type": "export_setup_viewed",
+      "count": 464,
+      "users": 228,
+      "anonymousCount": 451
+    },
+    {
+      "type": "export_settings_viewed",
+      "count": 460,
+      "users": 228,
+      "anonymousCount": 447
+    },
+    {
+      "type": "plugin_opened",
+      "count": 454,
+      "users": 297,
+      "anonymousCount": 440
+    },
+    {
+      "type": "plugin_load",
+      "count": 454,
+      "users": 298,
+      "anonymousCount": 440
+    },
+    {
+      "type": "session_opened",
+      "count": 448,
+      "users": 298,
+      "anonymousCount": 434
+    },
+    {
+      "type": "onboarding_started",
+      "count": 429,
+      "users": 292,
+      "anonymousCount": 429
+    },
+    {
+      "type": "prototype_path_selected",
+      "count": 370,
+      "users": 178,
+      "anonymousCount": 366
+    },
+    {
+      "type": "first_action_completed",
+      "count": 329,
+      "users": 220,
+      "anonymousCount": 316
+    },
+    {
+      "type": "prototype_path_auto_selected",
+      "count": 301,
+      "users": 45,
+      "anonymousCount": 301
+    },
+    {
+      "type": "first_open",
+      "count": 287,
+      "users": 287,
+      "anonymousCount": 286
+    },
+    {
+      "type": "power_user_detected",
+      "count": 251,
+      "users": 126,
+      "anonymousCount": 250
+    },
+    {
+      "type": "upsell_viewed",
+      "count": 223,
+      "users": 170,
+      "anonymousCount": 215
+    },
+    {
+      "type": "export_clicked",
+      "count": 211,
+      "users": 169,
+      "anonymousCount": 207
+    },
+    {
+      "type": "flow_detection_failed",
+      "count": 211,
+      "users": 40,
+      "anonymousCount": 211
+    },
+    {
+      "type": "download_started",
+      "count": 209,
+      "users": 161,
+      "anonymousCount": 206
+    },
+    {
+      "type": "download_clicked",
+      "count": 209,
+      "users": 161,
+      "anonymousCount": 206
+    },
+    {
+      "type": "export_started",
+      "count": 208,
+      "users": 168,
+      "anonymousCount": 204
+    },
+    {
+      "type": "export",
+      "count": 208,
+      "users": 168,
+      "anonymousCount": 204
+    },
+    {
+      "type": "upsell_card_viewed",
+      "count": 192,
+      "users": 163,
+      "anonymousCount": 189
+    },
+    {
+      "type": "upgrade_viewed",
+      "count": 191,
+      "users": 162,
+      "anonymousCount": 188
+    },
+    {
+      "type": "export_ready",
+      "count": 187,
+      "users": 160,
+      "anonymousCount": 184
+    },
+    {
+      "type": "export_success",
+      "count": 186,
+      "users": 160,
+      "anonymousCount": 183
+    },
+    {
+      "type": "export_succeeded",
+      "count": 186,
+      "users": 160,
+      "anonymousCount": 183
+    },
+    {
+      "type": "export_completed",
+      "count": 186,
+      "users": 160,
+      "anonymousCount": 183
+    },
+    {
+      "type": "export_success_upsell_opportunity",
+      "count": 185,
+      "users": 159,
+      "anonymousCount": 182
+    },
+    {
+      "type": "transcode_completed",
+      "count": 178,
+      "users": 0,
+      "anonymousCount": 178
+    },
+    {
+      "type": "transcode_started",
+      "count": 178,
+      "users": 0,
+      "anonymousCount": 178
+    },
+    {
+      "type": "video_export_completed",
+      "count": 178,
+      "users": 156,
+      "anonymousCount": 178
+    },
+    {
+      "type": "export_settings_changed",
+      "count": 174,
+      "users": 63,
+      "anonymousCount": 146
+    },
+    {
+      "type": "payload_preflight_started",
+      "count": 164,
+      "users": 144,
+      "anonymousCount": 160
+    },
+    {
+      "type": "upload_started",
+      "count": 163,
+      "users": 143,
+      "anonymousCount": 160
+    },
+    {
+      "type": "upload_completed",
+      "count": 163,
+      "users": 143,
+      "anonymousCount": 160
+    },
+    {
+      "type": "payload_preflight_completed",
+      "count": 163,
+      "users": 143,
+      "anonymousCount": 160
+    },
+    {
+      "type": "onboarding_completed",
+      "count": 160,
+      "users": 160,
+      "anonymousCount": 158
+    },
+    {
+      "type": "first_value_reached",
+      "count": 159,
+      "users": 159,
+      "anonymousCount": 158
+    },
+    {
+      "type": "format_interest",
+      "count": 119,
+      "users": 46,
+      "anonymousCount": 97
+    },
+    {
+      "type": "demo_state_shown",
+      "count": 104,
+      "users": 78,
+      "anonymousCount": 104
+    },
+    {
+      "type": "review_prompt_shown",
+      "count": 100,
+      "users": 92,
+      "anonymousCount": 98
+    },
+    {
+      "type": "post_success_email_prompt_shown",
+      "count": 100,
+      "users": 92,
+      "anonymousCount": 100
+    },
+    {
+      "type": "path_selection_prompted",
+      "count": 95,
+      "users": 64,
+      "anonymousCount": 95
+    },
+    {
+      "type": "moderate_user_detected",
+      "count": 91,
+      "users": 51,
+      "anonymousCount": 90
+    },
+    {
+      "type": "resolution_selected",
+      "count": 55,
+      "users": 26,
+      "anonymousCount": 49
+    },
+    {
+      "type": "upgrade_clicked",
+      "count": 38,
+      "users": 23,
+      "anonymousCount": 30
+    },
+    {
+      "type": "paywall_viewed",
+      "count": 37,
+      "users": 25,
+      "anonymousCount": 28
+    },
+    {
+      "type": "selected_paid_feature",
+      "count": 31,
+      "users": 23,
+      "anonymousCount": 26
+    },
+    {
+      "type": "moderate_user_post_export",
+      "count": 30,
+      "users": 28,
+      "anonymousCount": 30
+    },
+    {
+      "type": "checkout_email_prompt_shown",
+      "count": 30,
+      "users": 22,
+      "anonymousCount": 30
+    },
+    {
+      "type": "export_another_clicked",
+      "count": 23,
+      "users": 22,
+      "anonymousCount": 21
+    },
+    {
+      "type": "viral_growth_action",
+      "count": 18,
+      "users": 0,
+      "anonymousCount": 18
+    },
+    {
+      "type": "flow_detection_stuck",
+      "count": 17,
+      "users": 14,
+      "anonymousCount": 17
+    },
+    {
+      "type": "power_user_post_export",
+      "count": 14,
+      "users": 14,
+      "anonymousCount": 14
+    },
+    {
+      "type": "export_safe_retry_failed",
+      "count": 11,
+      "users": 4,
+      "anonymousCount": 11
+    },
+    {
+      "type": "export_safe_retry_started",
+      "count": 11,
+      "users": 4,
+      "anonymousCount": 11
+    },
+    {
+      "type": "export_failed",
+      "count": 11,
+      "users": 4,
+      "anonymousCount": 11
+    },
+    {
+      "type": "payment_poll_started",
+      "count": 9,
+      "users": 3,
+      "anonymousCount": 0
+    },
+    {
+      "type": "checkout_started",
+      "count": 8,
+      "users": 3,
+      "anonymousCount": 0
+    },
+    {
+      "type": "checkout_start",
+      "count": 8,
+      "users": 3,
+      "anonymousCount": 0
+    },
+    {
+      "type": "checkout_created",
+      "count": 8,
+      "users": 3,
+      "anonymousCount": 0
+    },
+    {
+      "type": "checkout_opened",
+      "count": 8,
+      "users": 3,
+      "anonymousCount": 0
+    },
+    {
+      "type": "share_link_requested",
+      "count": 7,
+      "users": 4,
+      "anonymousCount": 7
+    },
+    {
+      "type": "share_clicked",
+      "count": 4,
+      "users": 3,
+      "anonymousCount": 4
+    },
+    {
+      "type": "share_link_created",
+      "count": 4,
+      "users": 4,
+      "anonymousCount": 4
+    },
+    {
+      "type": "review_invite_experiment_exposed",
+      "count": 4,
+      "users": 3,
+      "anonymousCount": 4
+    },
+    {
+      "type": "share_link_copied",
+      "count": 4,
+      "users": 3,
+      "anonymousCount": 4
+    },
+    {
+      "type": "client_review_link_clicked",
+      "count": 4,
+      "users": 3,
+      "anonymousCount": 4
+    },
+    {
+      "type": "checkout_recovered",
+      "count": 2,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "payment_confirmed",
+      "count": 2,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "payment_poll_timeout",
+      "count": 2,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "email_captured",
+      "count": 2,
+      "users": 2,
+      "anonymousCount": 0
+    },
+    {
+      "type": "review_room_opened",
+      "count": 2,
+      "users": 2,
+      "anonymousCount": 2
+    },
+    {
+      "type": "share_page_viewed",
+      "count": 2,
+      "users": 2,
+      "anonymousCount": 2
+    },
+    {
+      "type": "subscription_renewed",
+      "count": 2,
+      "users": 2,
+      "anonymousCount": 0
+    },
+    {
+      "type": "copy_export_details_clicked",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 1
+    },
+    {
+      "type": "review_invite_panel_shown",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 1
+    },
+    {
+      "type": "review_feedback_not_yet",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 1
+    },
+    {
+      "type": "checkout_completed",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "export_blocked",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 1
+    },
+    {
+      "type": "post_success_email_dismissed",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 1
+    },
+    {
+      "type": "payment_completed",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "checkout_email_abandoned",
+      "count": 1,
+      "users": 0,
+      "anonymousCount": 1
+    },
+    {
+      "type": "large_flow_pass_purchased",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 0
+    },
+    {
+      "type": "license_validate",
+      "count": 1,
+      "users": 1,
+      "anonymousCount": 0
+    }
+  ],
+  "dailyEvents": [
+    {
+      "date": "2026-09-07T00:00:00.000Z",
+      "count": 398
+    },
+    {
+      "date": "2026-09-06T00:00:00.000Z",
+      "count": 497
+    },
+    {
+      "date": "2026-09-05T00:00:00.000Z",
+      "count": 113
+    },
+    {
+      "date": "2026-09-04T00:00:00.000Z",
+      "count": 595
+    },
+    {
+      "date": "2026-09-03T00:00:00.000Z",
+      "count": 375
+    },
+    {
+      "date": "2026-09-02T00:00:00.000Z",
+      "count": 358
+    },
+    {
+      "date": "2026-09-01T00:00:00.000Z",
+      "count": 437
+    },
+    {
+      "date": "2026-08-31T00:00:00.000Z",
+      "count": 95
+    }
+  ],
+  "activeUsers30d": 334,
+  "totalSubscriptions": 392,
+  "proSubscriptions": 4,
+  "trialingSubscriptions": 0,
+  "funnel30d": {
+    "firstOpenEvents": 287,
+    "sessionOpenedUsers": 298,
+    "pluginOpenedUsers": 297,
+    "firstOpenUsers": 287,
+    "onboardingStartedUsers": 292,
+    "onboardingCompletedUsers": 160,
+    "emailCapturedUsers": 2,
+    "firstActionCompletedUsers": 220,
+    "demoStateShownUsers": 78,
+    "prototypeDetectedUsers": 231,
+    "prototypePathSelectedUsers": 178,
+    "prototypePathAutoSelectedUsers": 45,
+    "exportSetupViewedUsers": 228,
+    "exportSettingsChangedUsers": 63,
+    "formatInterestUsers": 46,
+    "firstValueReachedUsers": 159,
+    "exportStartedUsers": 168,
+    "exportStartedAttempts": 208,
+    "exportAttemptUsers": 168,
+    "exportCompletedUsers": 160,
+    "exportCompletedAttempts": 186,
+    "exportSuccessUsers": 160,
+    "exportFailedAttempts": 11,
+    "transcodeCompletedAttempts": 178,
+    "downloadClickedUsers": 161,
+    "reviewPromptShownUsers": 92,
+    "reviewPromptClickedUsers": 0,
+    "reviewFeedbackPositiveUsers": 0,
+    "reviewFeedbackNotYetUsers": 1,
+    "shareLinkRequestedUsers": 4,
+    "shareLinkCreatedUsers": 4,
+    "shareLinkCopiedUsers": 3,
+    "shareLinkFailedUsers": 0,
+    "sharePageViewedUsers": 2,
+    "reviewRoomOpenedUsers": 2,
+    "reviewCommentCreatedUsers": 0,
+    "reviewStatusUpdatedUsers": 0,
+    "viralGrowthActionUsers": 0,
+    "upsellViewedUsers": 170,
+    "upsellCardViewedUsers": 163,
+    "quotaPaywallViewedUsers": 25,
+    "legacyAmbiguousPaywallViewedUsers": 0,
+    "rawPaywallViewedUsers": 25,
+    "paywallViewedUsers": 25,
+    "upgradeClickedUsers": 23,
+    "checkoutEmailSubmittedUsers": 0,
+    "checkoutErrorUsers": 0,
+    "checkoutEmailPromptShownUsers": 22,
+    "checkoutEmailAbandonedUsers": 0,
+    "pricingVariantAssignedUsers": 328,
+    "checkoutStartUsers": 3,
+    "checkoutCreatedUsers": 3,
+    "checkoutOpenedUsers": 3,
+    "checkoutBlockedActiveEntitlementUsers": 0,
+    "checkoutCompletedUsers": 1,
+    "paymentPollStartedUsers": 3,
+    "paymentPollTimeoutUsers": 1,
+    "paymentStatusCheckedUsers": 0,
+    "paymentConfirmedUsers": 1,
+    "largeFlowPassPurchasedUsers": 1,
+    "billingManagementLinkRequestedUsers": 0,
+    "billingManagementTokenIssuedUsers": 0,
+    "subscriptionCancellationScheduledUsers": 0,
+    "trialStartedUsers": 0,
+    "trialConvertedUsers": 0,
+    "trialEndingSoonUsers": 0
+  },
+  "shareInviteExperiment30d": {
+    "exposedControlUsers": 2,
+    "exposedTreatmentUsers": 1,
+    "panelShownUsers": 1,
+    "linkCopiedUsers": 0,
+    "emailInviteUsers": 0,
+    "nativeShareUsers": 0,
+    "reviewRoomOpenedControlUsers": 1,
+    "reviewRoomOpenedTreatmentUsers": 1,
+    "reviewRoomOpenEventsControl": 1,
+    "reviewRoomOpenEventsTreatment": 1,
+    "reviewActionControlUsers": 0,
+    "reviewActionTreatmentUsers": 0,
+    "successMetric": "invite_panel review-room-open rate >= control review-room-open rate"
+  },
+  "pricingExperiment30d": [
+    {
+      "pricingVariant": "large_flow_pass",
+      "priceLabel": "$4 once",
+      "amountCents": 400,
+      "assignedUsers": 3,
+      "upsellViewedUsers": 0,
+      "upsellCardViewedUsers": 0,
+      "quotaPaywallViewedUsers": 0,
+      "legacyAmbiguousPaywallViewedUsers": 0,
+      "rawPaywallViewedUsers": 0,
+      "paywallViewedUsers": 0,
+      "upgradeClickedUsers": 0,
+      "checkoutCreatedUsers": 3,
+      "checkoutOpenedUsers": 3,
+      "checkoutCompletedUsers": 1,
+      "paymentConfirmedUsers": 1
+    },
+    {
+      "pricingVariant": "monthly_5",
+      "priceLabel": "$5/mo",
+      "amountCents": 500,
+      "assignedUsers": 305,
+      "upsellViewedUsers": 149,
+      "upsellCardViewedUsers": 149,
+      "quotaPaywallViewedUsers": 24,
+      "legacyAmbiguousPaywallViewedUsers": 0,
+      "rawPaywallViewedUsers": 24,
+      "paywallViewedUsers": 24,
+      "upgradeClickedUsers": 22,
+      "checkoutCreatedUsers": 1,
+      "checkoutOpenedUsers": 1,
+      "checkoutCompletedUsers": 0,
+      "paymentConfirmedUsers": 0
+    },
+    {
+      "pricingVariant": "studio_monthly",
+      "priceLabel": "$5/mo",
+      "amountCents": 500,
+      "assignedUsers": 23,
+      "upsellViewedUsers": 14,
+      "upsellCardViewedUsers": 14,
+      "quotaPaywallViewedUsers": 1,
+      "legacyAmbiguousPaywallViewedUsers": 0,
+      "rawPaywallViewedUsers": 1,
+      "paywallViewedUsers": 1,
+      "upgradeClickedUsers": 1,
+      "checkoutCreatedUsers": 0,
+      "checkoutOpenedUsers": 0,
+      "checkoutCompletedUsers": 0,
+      "paymentConfirmedUsers": 0
+    },
+    {
+      "pricingVariant": "unknown",
+      "priceLabel": "",
+      "amountCents": 0,
+      "assignedUsers": 0,
+      "upsellViewedUsers": 23,
+      "upsellCardViewedUsers": 0,
+      "quotaPaywallViewedUsers": 0,
+      "legacyAmbiguousPaywallViewedUsers": 0,
+      "rawPaywallViewedUsers": 0,
+      "paywallViewedUsers": 0,
+      "upgradeClickedUsers": 0,
+      "checkoutCreatedUsers": 0,
+      "checkoutOpenedUsers": 0,
+      "checkoutCompletedUsers": 0,
+      "paymentConfirmedUsers": 1
+    }
+  ],
+  "offerExperiment30d": {
+    "experimentId": "project_pass_primary_v1",
+    "successMetric": "payment-confirmed rate and revenue per exposed user",
+    "variants": [
+      {
+        "variant": "pro_first",
+        "primaryOffer": "monthly",
+        "assignedUsers": 79,
+        "exposedUsers": 37,
+        "upgradeClickedUsers": 1,
+        "checkoutCreated": 0,
+        "paymentsConfirmed": 0,
+        "projectPassPurchases": 0
+      },
+      {
+        "variant": "project_pass_first",
+        "primaryOffer": "large_export",
+        "assignedUsers": 220,
+        "exposedUsers": 126,
+        "upgradeClickedUsers": 22,
+        "checkoutCreated": 8,
+        "paymentsConfirmed": 1,
+        "projectPassPurchases": 1
+      }
+    ]
+  },
+  "pricingPageExperiment30d": {
+    "experimentId": "good_better_best_pricing_v1",
+    "successMetric": "payment-confirmed rate by pricing-page visitor assignment",
+    "variants": []
+  },
+  "freeTier30d": {
+    "experimentId": "one_export_v1",
+    "freeLimit": 1,
+    "trackedFreeUsersThisMonth": 34,
+    "trackedFreeExportsThisMonth": 31,
+    "freeUsersAtLimit": 31
+  },
+  "generatedAt": "2026-09-07T17:11:40.489Z"
+}

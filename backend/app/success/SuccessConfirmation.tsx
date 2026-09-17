@@ -38,7 +38,7 @@ export function SuccessConfirmation({ sessionId }: { sessionId?: string }) {
   if (state === 'confirmed') {
     return (
       <p style={{ color: '#166534', fontSize: 14, marginBottom: 16 }}>
-        Payment confirmed. Return to Figma and ProtoVid will unlock Pro automatically.
+        Payment confirmed. Return to Figma and ProtoVid will unlock paid access automatically.
       </p>
     );
   }
@@ -54,7 +54,7 @@ export function SuccessConfirmation({ sessionId }: { sessionId?: string }) {
   if (state === 'confirming') {
     return (
       <p style={{ color: '#555', fontSize: 14, marginBottom: 16 }}>
-        Confirming your Pro access...
+        Confirming your paid access...
       </p>
     );
   }

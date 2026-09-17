@@ -11,3 +11,8 @@ dist/
 backend/.next/
 backend/tsconfig.tsbuildinfo
 .env*.local
+
+# Stripe export contains customer emails (PII) — never commit
+unified_payments.csv
+# Generated production analytics snapshots (business-sensitive aggregates)
+analysis/

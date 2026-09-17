@@ -3,53 +3,62 @@
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import {
-  GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
   LARGE_FLOW_PASS,
-  MONTHLY_PRICE_5,
-  getGoodBetterBestPricingAssignment,
-  type GoodBetterBestPricingVariant,
+  STUDIO_MONTHLY,
 } from '@/lib/pricingExperiment';
 
 const ANONYMOUS_ID_STORAGE_KEY = 'protovid_pricing_actor_id';
+const PLG_PRICING_EXPERIMENT_ID = 'b2b_plg_pricing_v1';
+const PLG_PRICING_VARIANT = 'studio_self_serve';
+
+type CheckoutPlan = 'monthly' | 'yearly' | 'large_export';
 
 function getOrCreatePricingActorId() {
-  const existing = window.localStorage.getItem(ANONYMOUS_ID_STORAGE_KEY);
+  let existing: string | null = null;
+  try { existing = window.localStorage.getItem(ANONYMOUS_ID_STORAGE_KEY); } catch { /* Checkout works without storage. */ }
   if (existing) return existing;
 
   const generated = `pricing_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-  window.localStorage.setItem(ANONYMOUS_ID_STORAGE_KEY, generated);
+  try { window.localStorage.setItem(ANONYMOUS_ID_STORAGE_KEY, generated); } catch { /* Use the session identity. */ }
   return generated;
 }
 
-function getPricingExperimentOverride(): GoodBetterBestPricingVariant | null {
-  const value = new URLSearchParams(window.location.search).get('pricing_test');
-  return value === 'good_better_best' || value === 'control' ? value : null;
-}
+const styles = {
+  page: {
+    minHeight: '100vh',
+    padding: '36px 20px 72px',
+    background: '#0b0f0d',
+    color: '#e8eee9',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+  },
+  shell: { maxWidth: 1040, margin: '0 auto' },
+  card: {
+    padding: 24,
+    borderRadius: 8,
+    background: '#121815',
+    border: '1px solid #28332d',
+  },
+  button: {
+    width: '100%',
+    padding: '13px 16px',
+    borderRadius: 6,
+    border: 'none',
+    fontWeight: 800,
+    fontSize: 15,
+  },
+} as const;
 
 export default function PricingPage() {
-  const [loadingPlan, setLoadingPlan] = useState<'monthly' | 'large_export' | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<CheckoutPlan | null>(null);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [anonymousId, setAnonymousId] = useState('');
-  const [pricingPageExperimentVariant, setPricingPageExperimentVariant] =
-    useState<GoodBetterBestPricingVariant>('control');
-  const validEmail = email.trim().includes('@');
-  const monthlyPriceLabel = MONTHLY_PRICE_5.label;
-  const projectPassLabel = LARGE_FLOW_PASS.label;
-  const isGoodBetterBest = pricingPageExperimentVariant === 'good_better_best';
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const studioOffer = STUDIO_MONTHLY;
 
   useEffect(() => {
     const actorId = getOrCreatePricingActorId();
-    const override = getPricingExperimentOverride();
-    const assignment = override
-      ? {
-          id: GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
-          variant: override,
-        }
-      : getGoodBetterBestPricingAssignment(actorId);
-
     setAnonymousId(actorId);
-    setPricingPageExperimentVariant(assignment.variant);
 
     fetch('/api/track', {
       method: 'POST',
@@ -59,23 +68,23 @@ export default function PricingPage() {
         metadata: {
           source: 'pricing_page',
           anonymousId: actorId,
-          event_id: `${assignment.id}:${assignment.variant}:${actorId}`,
-          pricing_page_experiment_id: assignment.id,
-          pricing_page_experiment_variant: assignment.variant,
-          pricingVariant: MONTHLY_PRICE_5.id,
-          priceLabel: MONTHLY_PRICE_5.label,
-          amountCents: MONTHLY_PRICE_5.amountCents,
+          event_id: `${PLG_PRICING_EXPERIMENT_ID}:${PLG_PRICING_VARIANT}:${actorId}`,
+          pricing_page_experiment_id: PLG_PRICING_EXPERIMENT_ID,
+          pricing_page_experiment_variant: PLG_PRICING_VARIANT,
+          pricingVariant: STUDIO_MONTHLY.id,
+          priceLabel: STUDIO_MONTHLY.label,
+          amountCents: STUDIO_MONTHLY.amountCents,
           project_pass_price_label: LARGE_FLOW_PASS.label,
           project_pass_amount_cents: LARGE_FLOW_PASS.amountCents,
-          override: override || null,
         },
       }),
     }).catch(() => undefined);
   }, []);
 
-  async function checkout(plan: 'monthly' | 'large_export') {
+  async function checkout(plan: CheckoutPlan) {
+    if (loadingPlan) return;
     if (!validEmail) {
-      setError('Enter your email to continue.');
+      setError('Enter the email used in ProtoVid.');
       return;
     }
 
@@ -90,8 +99,8 @@ export default function PricingPage() {
           email: email.trim(),
           plan,
           anonymousId: anonymousId || undefined,
-          pricingPageExperimentId: GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
-          pricingPageExperimentVariant,
+          pricingPageExperimentId: PLG_PRICING_EXPERIMENT_ID,
+          pricingPageExperimentVariant: PLG_PRICING_VARIANT,
         }),
       });
       const data = await res.json() as {
@@ -105,7 +114,8 @@ export default function PricingPage() {
         setError(data.error ?? 'Checkout failed.');
         return;
       }
-      await fetch('/api/track', {
+
+      void fetch('/api/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,11 +128,12 @@ export default function PricingPage() {
             priceLabel: data.priceLabel || null,
             amountCents: data.amountCents || null,
             anonymousId: anonymousId || null,
-            pricing_page_experiment_id: GOOD_BETTER_BEST_PRICING_EXPERIMENT_ID,
-            pricing_page_experiment_variant: pricingPageExperimentVariant,
+            pricing_page_experiment_id: PLG_PRICING_EXPERIMENT_ID,
+            pricing_page_experiment_variant: PLG_PRICING_VARIANT,
           },
         }),
       }).catch(() => undefined);
+
       window.location.assign(data.url);
     } catch {
       setError('Could not start checkout.');
@@ -134,168 +145,94 @@ export default function PricingPage() {
   return (
     <>
       <Head>
-        <title>ProtoVid Pricing - Product Demo Videos</title>
+        <title>ProtoVid Pricing - Self-Serve Video Export</title>
         <meta
           name="description"
-          content="Start free with 3 watermarked 720p exports. Use Project Pass for one HD/4K launch deadline or Pro for recurring client-ready product demo videos from Figma."
+          content="Start free, buy one Project Pass, or use ProtoVid Studio for recurring Figma prototype approvals. Self-serve checkout with unlimited reviewers."
         />
       </Head>
-      <main style={{
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
-        minHeight: '100vh',
-        padding: '72px 24px',
-        background: 'linear-gradient(180deg, #08111f 0%, #111827 100%)',
-        color: '#e5e7eb',
-      }}>
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
-          <p style={{ fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: 12 }}>
-            ProtoVid pricing
-          </p>
-          <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)', lineHeight: 1.02, letterSpacing: 0, margin: 0, color: '#fff' }}>
-            {isGoodBetterBest
-              ? 'Good, better, and best ways to turn Figma prototypes into demo videos.'
-              : 'Product demo videos from Figma prototypes, not another screen recorder.'}
-          </h1>
-          <p style={{ marginTop: 18, fontSize: 18, lineHeight: 1.7, maxWidth: 720, color: '#cbd5e1' }}>
-            {isGoodBetterBest
-              ? 'Start with watermarked proof exports, buy one clean launch window, or keep recurring client-ready demos moving with Pro.'
-              : 'ProtoVid exports the real prototype flow as MP4, WebM, or GIF. Paid access is priced around polished demo delivery: 1080p/4K, no watermark, and MP4 review rooms for comments, approval, and delivery signal.'}
-          </p>
+      <main style={styles.page}>
+        <div style={styles.shell}>
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <a href="/" style={{ color: '#fff', textDecoration: 'none', fontSize: 19, fontWeight: 900 }}>ProtoVid</a>
+            <a href="/account" style={{ color: '#a9b8ae', textDecoration: 'none', fontSize: 14 }}>Manage billing</a>
+          </header>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginTop: 34 }}>
-            <section style={{ padding: 24, borderRadius: 18, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ color: '#94a3b8', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {isGoodBetterBest ? 'Good' : 'Free'}
-              </div>
-              <div style={{ fontSize: 34, fontWeight: 800, marginTop: 8, color: '#fff' }}>$0</div>
-              <p style={{ marginTop: 12, lineHeight: 1.6, color: '#cbd5e1' }}>3 exports per month, 720p, watermark included.</p>
-              <p style={{ marginTop: 12, fontSize: 14, color: '#94a3b8' }}>
-                {isGoodBetterBest ? 'Good for proof exports and validating the demo workflow.' : 'Best for proof exports and validating the demo workflow.'}
-              </p>
+          <section style={{ padding: '72px 0 34px', maxWidth: 780 }}>
+            <p style={{ margin: 0, color: '#55d18c', fontSize: 13, fontWeight: 800, textTransform: 'uppercase' }}>Self-serve pricing</p>
+            <h1 style={{ margin: '12px 0 0', color: '#fff', fontSize: 52, lineHeight: 1.04, letterSpacing: 0 }}>
+              Finish your next client delivery.
+            </h1>
+            <p style={{ margin: '18px 0 0', color: '#b8c4bc', fontSize: 18, lineHeight: 1.65 }}>
+              Finish your client delivery with seven days of unlimited exports. Choose Studio when you need exports every month.
+            </p>
+          </section>
+
+          <p><a href="/guides/first-export" style={{ color: "#9cf0bb" }}>Try a free proof before choosing a plan →</a></p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
+            <section style={styles.card}>
+              <div style={{ color: '#a9b8ae', fontSize: 13, fontWeight: 800 }}>FREE</div>
+              <div style={{ marginTop: 8, color: '#fff', fontSize: 34, fontWeight: 900 }}>$0</div>
+              <p style={{ minHeight: 50, color: '#b8c4bc', lineHeight: 1.55 }}>Prove the workflow on a real Figma prototype.</p>
+              {['1 export each month', '720p with watermark', '7-day approval room', 'Unlimited reviewers'].map(item => (
+                <p key={item} style={{ margin: '9px 0', color: '#d5ddd7', fontSize: 14 }}>✓ {item}</p>
+              ))}
             </section>
 
-            <section style={{ padding: 24, borderRadius: 18, background: 'rgba(124,110,240,0.12)', border: '1px solid rgba(124,110,240,0.45)', boxShadow: '0 24px 70px rgba(124,110,240,0.18)' }}>
-              <div style={{ color: '#d8d6ff', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {isGoodBetterBest ? 'Better' : 'Project Pass'}
-              </div>
-              <div style={{ fontSize: 34, fontWeight: 800, marginTop: 8, color: '#fff' }}>{projectPassLabel}</div>
-              <p style={{ marginTop: 12, lineHeight: 1.6, color: '#eef2ff' }}>7 days of unlimited HD/4K demo exports with no watermark, plus MP4 review rooms and decision briefs.</p>
-              <p style={{ marginTop: 12, fontSize: 14, color: '#d8d6ff' }}>
-                {isGoodBetterBest ? 'Better for one launch, client, or stakeholder deadline. No subscription.' : 'Best for one launch, client, or stakeholder deadline. No subscription.'}
-              </p>
+            <section style={{ ...styles.card, borderColor: '#d46a5f' }}>
+              <div style={{ color: '#f09a91', fontSize: 13, fontWeight: 800 }}>PROJECT PASS</div>
+              <div style={{ marginTop: 8, color: '#fff', fontSize: 34, fontWeight: 900 }}>{LARGE_FLOW_PASS.label}</div>
+              <p style={{ minHeight: 50, color: '#b8c4bc', lineHeight: 1.55 }}>Finish one client delivery or approval deadline.</p>
+              {['7 days of unlimited exports', '1080p and 4K', 'No watermark', '30-day approval rooms'].map(item => (
+                <p key={item} style={{ margin: '9px 0', color: '#d5ddd7', fontSize: 14 }}>✓ {item}</p>
+              ))}
             </section>
 
-            <section style={{ padding: 24, borderRadius: 18, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ color: '#d8d6ff', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {isGoodBetterBest ? 'Best' : 'Pro'}
+            <section style={{ ...styles.card, borderColor: '#55d18c', background: '#101c16' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                <div style={{ color: '#75e5a5', fontSize: 13, fontWeight: 800 }}>STUDIO</div>
+                <span style={{ padding: '4px 7px', borderRadius: 5, background: '#193d29', color: '#9cf0bb', fontSize: 11, fontWeight: 800 }}>FOR RECURRING WORK</span>
               </div>
-              <div style={{ fontSize: 34, fontWeight: 800, marginTop: 8, color: '#fff' }}>{monthlyPriceLabel}</div>
-              <p style={{ marginTop: 12, lineHeight: 1.6, color: '#eef2ff' }}>Recurring client-ready demo exports, HD/4K, no watermark, review rooms, and owner analytics.</p>
-              <p style={{ marginTop: 12, fontSize: 14, color: '#d8d6ff' }}>
-                {isGoodBetterBest ? 'Best for product launches, client updates, and repeated iteration.' : 'Best for product launches, client updates, and repeated iteration.'}
-              </p>
+              <div style={{ marginTop: 8, color: '#fff', fontSize: 34, fontWeight: 900 }}>{studioOffer.label}</div>
+              <p style={{ minHeight: 50, color: '#c6d4ca', lineHeight: 1.55 }}>For a creator delivering new walkthroughs and revisions every month.</p>
+              {['Unlimited video exports', '1080p and 4K, no watermark', '30-day approval rooms', 'Unlimited external reviewers', 'View, comment, and status analytics'].map(item => (
+                <p key={item} style={{ margin: '9px 0', color: '#e0e9e2', fontSize: 14 }}>✓ {item}</p>
+              ))}
             </section>
           </div>
 
-          <div style={{
-            marginTop: 28,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
-            gap: 20,
-            alignItems: 'start',
-          }}>
-            <div style={{
-              padding: 24,
-              borderRadius: 18,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <h2 style={{ margin: 0, fontSize: 22, color: '#fff' }}>What paid access unlocks</h2>
-              <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-                {[
-                  'Unlimited MP4, WebM, and GIF exports during active access',
-                  'HD 1080p and 4K output',
-                  'No watermark for handoff',
-                  'MP4 demo review rooms with generated decision briefs',
-                  'Owner analytics for views, comments, and approval state',
-                  'Automatic payment detection back in Figma',
-                  'Cancel anytime from Stripe',
-                ].map(item => (
-                  <div key={item} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#e2e8f0' }}>
-                    <span style={{ color: '#7c6ef0' }}>•</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
+          <section style={{ marginTop: 22, padding: 24, borderRadius: 8, background: '#e8eee9', color: '#111713', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 28, alignItems: 'start' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 900, color: '#28784b' }}>CHOOSE YOUR DELIVERY WINDOW</p>
+              <h2 style={{ margin: '8px 0 0', fontSize: 27, letterSpacing: 0 }}>Attach paid access to your ProtoVid email.</h2>
+              <p style={{ margin: '10px 0 0', color: '#526057', lineHeight: 1.6 }}>Use the same email in checkout and ProtoVid to recover your purchase. After payment, return to the plugin and choose Check payment status if access is still updating.</p>
             </div>
-
-            <div style={{ padding: 24, borderRadius: 18, background: '#fff', color: '#111827' }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>
-                {isGoodBetterBest ? 'Pick Better or Best' : 'Choose your self-serve access'}
-              </p>
-              <p style={{ margin: '8px 0 16px', color: '#4b5563', lineHeight: 1.6 }}>
-                {isGoodBetterBest
-                  ? 'Better is a one-time Project Pass for one deadline. Best is Pro for recurring polished demos. Use the same email you use in Figma.'
-                  : 'Enter the same email you use in Figma. Stripe will attach access to that account and the plugin will unlock automatically.'}
-              </p>
+            <div>
               <input
                 type="email"
-                placeholder="you@example.com"
+                autoComplete="email"
+                aria-describedby="checkout-email-help"
+                aria-label="ProtoVid account email"
+                placeholder="you@company.com"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '1px solid #d1d5db',
-                  fontSize: 14,
-                  marginBottom: 12,
-                  boxSizing: 'border-box',
-                }}
+                onChange={event => setEmail(event.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 13px', borderRadius: 6, border: '1px solid #aab6ad', fontSize: 15, marginBottom: 10 }}
               />
-              <button
-                onClick={() => checkout('large_export')}
-                disabled={loadingPlan !== null || !validEmail}
-                style={{
-                  width: '100%',
-                  padding: '14px 18px',
-                  borderRadius: 10,
-                  background: '#7c6ef0',
-                  color: '#fff',
-                  border: 'none',
-                  fontWeight: 800,
-                  cursor: validEmail ? 'pointer' : 'not-allowed',
-                  opacity: loadingPlan !== null || !validEmail ? 0.7 : 1,
-                  fontSize: 15,
-                }}
-              >
-                {loadingPlan === 'large_export' ? 'Starting checkout…' : validEmail ? `${isGoodBetterBest ? 'Better' : 'Project Pass'} — ${projectPassLabel}` : 'Enter email to continue'}
+              <p id="checkout-email-help" style={{ fontSize: 13 }}>Your email connects this purchase to your plugin access.</p>
+              <button type="button" onClick={() => checkout('large_export')}
+                disabled={loadingPlan !== null}
+                style={{ ...styles.button, background: '#167b45', color: '#fff', opacity: loadingPlan !== null ? 0.65 : 1 }}>
+                {loadingPlan === 'large_export' ? 'Opening Stripe...' : `Buy Project Pass - ${LARGE_FLOW_PASS.label}`}
               </button>
-              <button
-                onClick={() => checkout('monthly')}
-                disabled={loadingPlan !== null || !validEmail}
-                style={{
-                  width: '100%',
-                  padding: '13px 18px',
-                  borderRadius: 10,
-                  background: '#fff',
-                  color: '#312e81',
-                  border: '1px solid #c7d2fe',
-                  fontWeight: 800,
-                  cursor: validEmail ? 'pointer' : 'not-allowed',
-                  opacity: loadingPlan !== null || !validEmail ? 0.7 : 1,
-                  fontSize: 15,
-                  marginTop: 10,
-                }}
-              >
-                {loadingPlan === 'monthly' ? 'Starting checkout…' : validEmail ? `${isGoodBetterBest ? 'Best' : 'Ongoing Pro'} — ${monthlyPriceLabel}` : 'Enter email to continue'}
+              <button type="button" onClick={() => checkout('monthly')}
+                disabled={loadingPlan !== null}
+                style={{ ...styles.button, marginTop: 9, background: 'transparent', color: '#245438', border: '1px solid #6d947c', opacity: loadingPlan !== null ? 0.65 : 1 }}>
+                {loadingPlan === 'monthly' ? 'Opening Stripe...' : `Start Studio - ${studioOffer.label}`}
               </button>
-              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#6b7280' }}>
-                Secure checkout powered by Stripe. The plugin detects your payment automatically after checkout.
-              </p>
-              {error && <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b91c1c' }}>{error}</p>}
+              <p style={{ margin: '9px 0 0', color: '#667269', fontSize: 12 }}>Secure Stripe checkout. Project Pass is a one-time payment for seven days and does not renew. Studio bills monthly until canceled; manage it from the billing portal.</p>
+              {error && <p role="alert" style={{ margin: '9px 0 0', color: '#a32920', fontSize: 13 }}>{error}</p>}
             </div>
-          </div>
+          </section>
         </div>
       </main>
     </>

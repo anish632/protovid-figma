@@ -8,17 +8,17 @@ ProtoVid is published by Das Group. It runs inside Figma, reads the prototype co
 
 - Platform: Figma Community plugin (runs in the Figma sandbox).
 - Output formats: MP4, WebM, GIF (H.264 for MP4).
-- Resolutions: 720p on Free; 1080p and 4K on Project Pass and Pro.
-- Watermark: present on Free exports; removed on Project Pass and Pro.
+- Resolutions: 720p on Free; 1080p and 4K on Project Pass and Studio.
+- Watermark: present on Free exports; removed on Project Pass and Studio.
 - Review rooms: browser-based links with a generated decision brief, timestamped comments, and approval / change-request status. No separate AI account required.
 - Install: https://www.figma.com/community/plugin/1606994616321079154
 - First successful action: Install from Figma Community, open the plugin on a page with a connected prototype flow, choose format and quality, export, and download the video.
 
 ## Pricing
 
-- Free: $0 — 3 watermarked 720p exports per month.
-- Project Pass: $4 once — 7 days of unlimited 1080p and 4K exports, no watermark, no subscription.
-- Pro: $5/month — unlimited 1080p and 4K exports, no watermark, review rooms, briefs, and owner analytics.
+- Free: $0 — 1 watermarked 720p export per month.
+- Project Pass: $4 once — 7 days of unlimited 1080p and 4K exports, no watermark, 30-day review rooms, no subscription.
+- Studio: $5/month — one creator account, unlimited external reviewers, unlimited 1080p and 4K exports, no watermark, 30-day review rooms, briefs, and owner analytics.
 
 ## Best for
 

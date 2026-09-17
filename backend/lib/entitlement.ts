@@ -1,4 +1,9 @@
-import { FREE_TIER_EXPORT_LIMIT, isPremiumSubscription } from './plans';
+import {
+  FREE_TIER_EXPERIMENT_ID,
+  FREE_TIER_EXPORT_LIMIT,
+  isPremiumSubscription,
+} from './plans';
+import { getBillingNotice, type BillingNotice } from './billingNotice';
 import type { Subscription } from './storage';
 
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'none';
@@ -8,12 +13,14 @@ export interface EntitlementResponse {
   billingPeriodKey: string;
   subscriptionStatus: SubscriptionStatus;
   isPaid: boolean;
+  freeTierExperimentId: string;
   freeExportsLimit: number;
   freeExportsUsed: number;
   freeExportsRemaining: number;
   watermarkRequired: boolean;
   canExport: boolean;
   upgradeRequired: boolean;
+  billingNotice: BillingNotice | null;
 }
 
 export function getBillingPeriodKey(date = new Date()): string {
@@ -26,8 +33,8 @@ export function buildEntitlementResponse(
   date = new Date()
 ): EntitlementResponse {
   const billingPeriodKey = getBillingPeriodKey(date);
-  const isPaid = isPremiumSubscription(subscription);
-  const subscriptionStatus: SubscriptionStatus = subscription.tier === 'pro'
+  const isPaid = isPremiumSubscription(subscription, date);
+  const subscriptionStatus: SubscriptionStatus = subscription.stripeSubscriptionId || subscription.tier === 'pro'
     ? subscription.status
     : 'none';
   const freeExportsUsed = isPaid || subscription.lastResetMonth !== billingPeriodKey
@@ -41,9 +48,11 @@ export function buildEntitlementResponse(
 
   return {
     userId,
+    billingNotice: getBillingNotice(subscription.status, subscription.billingState, date),
     billingPeriodKey,
     subscriptionStatus,
     isPaid,
+    freeTierExperimentId: FREE_TIER_EXPERIMENT_ID,
     freeExportsLimit: FREE_TIER_EXPORT_LIMIT,
     freeExportsUsed,
     freeExportsRemaining,

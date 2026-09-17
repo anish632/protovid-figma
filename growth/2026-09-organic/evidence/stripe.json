@@ -1,0 +1,74 @@
+{
+  "retrievedAt": "2026-09-07T18:28:58.718332+00:00",
+  "scope": "Configured Stripe account; no product filter. Amounts cents; cash before refunds/fees/tax separation. Sessions dated by creation; invoices by paid_at.",
+  "activeSubscriptions": 3,
+  "mrrCents": 1500.0,
+  "currencies": [
+    "usd"
+  ],
+  "paidCheckoutBuyers30d": 1,
+  "oneTimeCheckoutCount30d": 1,
+  "oneTimeCheckoutGrossCents30d": 400,
+  "subscriptionStarts30d": 0,
+  "paidRecurringInvoices30d": 3,
+  "recurringInvoicePaidCents30d": 1500,
+  "renewalInvoices30d": 3,
+  "prices": {
+    "PROTOVID_LARGE_EXPORT_PRICE_ID": {
+      "unit_amount": 900,
+      "currency": "usd",
+      "recurring": null,
+      "active": true,
+      "livemode": true
+    },
+    "PROTOVID_MONTHLY_5_PRICE_ID": {
+      "unit_amount": 500,
+      "currency": "usd",
+      "recurring": {
+        "aggregate_usage": null,
+        "interval": "month",
+        "interval_count": 1,
+        "meter": null,
+        "trial_period_days": null,
+        "usage_type": "licensed"
+      },
+      "active": true,
+      "livemode": true
+    },
+    "PROTOVID_PRICE_ID": {
+      "unit_amount": 800,
+      "currency": "usd",
+      "recurring": {
+        "aggregate_usage": null,
+        "interval": "month",
+        "interval_count": 1,
+        "meter": null,
+        "trial_period_days": null,
+        "usage_type": "licensed"
+      },
+      "active": true,
+      "livemode": true
+    },
+    "PROTOVID_PROJECT_PASS_PRICE_ID": {
+      "unit_amount": 400,
+      "currency": "usd",
+      "recurring": null,
+      "active": true,
+      "livemode": true
+    },
+    "PROTOVID_YEARLY_PRICE_ID": {
+      "unit_amount": 2900,
+      "currency": "usd",
+      "recurring": {
+        "aggregate_usage": null,
+        "interval": "year",
+        "interval_count": 1,
+        "meter": null,
+        "trial_period_days": null,
+        "usage_type": "licensed"
+      },
+      "active": true,
+      "livemode": true
+    }
+  }
+}

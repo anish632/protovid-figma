@@ -1,35 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
 import { retrieveSubscription, verifyWebhook } from '@/lib/stripe';
 import { setSubscription, findSubscriptionByCustomerId, findSubscriptionBySubscriptionId } from '@/lib/storage';
 import { getCheckoutEmail, getCheckoutEventMetadata, getCheckoutSubscriptionUpdate } from '@/lib/checkoutConfirmation';
+import { recordEvent } from '@/lib/events';
 import Stripe from 'stripe';
-
-function getDB() {
-  if (!process.env.NEON_DATABASE_URL) {
-    throw new Error('Database not configured');
-  }
-  return neon(process.env.NEON_DATABASE_URL);
-}
-
-async function recordEvent(email: string, eventType: string, metadata: Record<string, unknown> = {}) {
-  const sql = getDB();
-  await sql`
-    INSERT INTO protovid_events (
-      email,
-      event_type,
-      plugin_version,
-      metadata,
-      created_at
-    ) VALUES (
-      ${email.toLowerCase().trim()},
-      ${eventType},
-      ${'webhook'},
-      ${Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null},
-      CURRENT_TIMESTAMP
-    )
-  `;
-}
+import { syncBillingRecovery } from '@/lib/billingRecovery';
+import { deliverBillingNotification } from '@/lib/billingNotification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +23,16 @@ export async function POST(request: NextRequest) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
+
+    const recordWebhookEvent = (
+      email: string,
+      eventType: string,
+      metadata: Record<string, unknown> = {},
+    ) => recordEvent(email, eventType, {
+      ...metadata,
+      event_id: `stripe:${event.id}:${eventType}`,
+      stripe_event_id: event.id,
+    }, 'webhook');
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -83,14 +69,14 @@ export async function POST(request: NextRequest) {
         // single actor across the pre-checkout plugin session and this
         // post-payment webhook. Plugin-side `email_captured` misses users who
         // close the plugin before the poll resolves.
-        await recordEvent(email, 'email_captured', eventMetadata);
+        await recordWebhookEvent(email, 'email_captured', eventMetadata);
         if (session.metadata?.offer_type === 'large_flow_pass') {
-          await recordEvent(email, 'large_flow_pass_purchased', eventMetadata);
+          await recordWebhookEvent(email, 'large_flow_pass_purchased', eventMetadata);
         } else {
-          await recordEvent(email, 'subscription_started', eventMetadata);
+          await recordWebhookEvent(email, 'subscription_started', eventMetadata);
         }
-        await recordEvent(email, 'checkout_completed', eventMetadata);
-        await recordEvent(email, 'payment_confirmed', eventMetadata);
+        await recordWebhookEvent(email, 'checkout_completed', eventMetadata);
+        await recordWebhookEvent(email, 'payment_confirmed', eventMetadata);
         break;
       }
 
@@ -105,26 +91,24 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        // Ignore late events for an old subscription after a customer restarts.
+        if (existing.stripeSubscriptionId && existing.stripeSubscriptionId !== subscription.id) break;
         const previousState = await findSubscriptionBySubscriptionId(subscription.id);
-        const isActive = ['active', 'trialing'].includes(subscription.status);
-        const periodEnd = (subscription as any).current_period_end;
-        await setSubscription(existing.email, {
-          tier: isActive ? 'pro' : 'free',
-          status: subscription.status as any,
-          stripeSubscriptionId: subscription.id,
-          currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
-        });
+        if (!existing.stripeSubscriptionId) {
+          await setSubscription(existing.email, { stripeSubscriptionId: subscription.id });
+        }
+        // Access is reconciled from current Stripe state below, once per event.
 
         // Track trial events
         if (subscription.status === 'trialing') {
-          await recordEvent(existing.email, 'trial_started', {
+          await recordWebhookEvent(existing.email, 'trial_started', {
             trial_end: subscription.trial_end,
             subscription_id: subscription.id,
           });
         } else if (subscription.status === 'active' && event.type === 'customer.subscription.updated') {
           // Check if this was a trial conversion
           if (previousState?.status === 'trialing') {
-            await recordEvent(existing.email, 'trial_converted', {
+            await recordWebhookEvent(existing.email, 'trial_converted', {
               subscription_id: subscription.id,
             });
           }
@@ -138,7 +122,7 @@ export async function POST(request: NextRequest) {
 
         const existing = await findSubscriptionByCustomerId(customerId);
         if (existing) {
-          await recordEvent(existing.email, 'trial_ending_soon', {
+          await recordWebhookEvent(existing.email, 'trial_ending_soon', {
             trial_end: subscription.trial_end,
             subscription_id: subscription.id,
           });
@@ -146,34 +130,11 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        
-        const existing = await findSubscriptionBySubscriptionId(subscription.id);
-        if (!existing) {
-          console.warn('No subscription found for ID:', subscription.id);
-          break;
-        }
-
-        await setSubscription(existing.email, {
-          tier: 'free',
-          status: 'canceled',
-        });
+      case 'customer.subscription.deleted':
+      case 'invoice.payment_failed':
+      case 'invoice.payment_action_required':
+        // Current state reconciliation below handles retries and late events.
         break;
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const customerId = invoice.customer as string;
-
-        const existing = await findSubscriptionByCustomerId(customerId);
-        if (existing) {
-          await setSubscription(existing.email, {
-            status: 'past_due',
-          });
-        }
-        break;
-      }
 
       case 'invoice.paid':
       case 'invoice.payment_succeeded': {
@@ -199,22 +160,7 @@ export async function POST(request: NextRequest) {
         const amountPaid = typeof invoice.amount_paid === 'number' ? invoice.amount_paid : null;
         const isRenewal = billingReason === 'subscription_cycle';
 
-        if (subscriptionId) {
-          try {
-            const stripeSubscription = await retrieveSubscription(subscriptionId);
-            const periodEnd = (stripeSubscription as any).current_period_end;
-            await setSubscription(existing.email, {
-              tier: ['active', 'trialing'].includes(stripeSubscription.status) ? 'pro' : 'free',
-              status: stripeSubscription.status as any,
-              stripeSubscriptionId: stripeSubscription.id,
-              currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
-            });
-          } catch (error) {
-            console.warn('Failed to refresh subscription after paid invoice:', error);
-          }
-        }
-
-        await recordEvent(existing.email, isRenewal ? 'subscription_renewed' : 'invoice_paid', {
+        await recordWebhookEvent(existing.email, isRenewal ? 'subscription_renewed' : 'invoice_paid', {
           source: 'stripe_webhook',
           event: event.type,
           stripe_invoice_id: invoice.id,
@@ -227,6 +173,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const billingEvents = ['customer.subscription.created', 'customer.subscription.updated',
+      'customer.subscription.deleted', 'invoice.payment_failed', 'invoice.payment_action_required',
+      'invoice.paid', 'invoice.payment_succeeded'];
+    if (billingEvents.includes(event.type)) {
+      const object = event.data.object as { customer?: string | { id: string } | null };
+      const customerId = typeof object.customer === 'string' ? object.customer : object.customer?.id;
+      const existing = customerId ? await findSubscriptionByCustomerId(customerId) : null;
+      if (existing) {
+        const current = await syncBillingRecovery(existing.email);
+        try { await deliverBillingNotification(current); }
+        catch (error) { console.error('Billing email deferred to scheduled recovery:', error); }
+      }
+    }
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);

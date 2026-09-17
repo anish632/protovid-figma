@@ -4,7 +4,7 @@ import MarketingLanding from './MarketingLanding';
 export const metadata: Metadata = {
   metadataBase: new URL('https://protovid.dasgroupllc.com'),
   title: 'Figma Prototype to Product Demo Video — ProtoVid',
-  description: 'Turn a connected Figma prototype flow into a polished MP4, WebM, or GIF product demo. No screen recording, no editing timeline. Free to start, Pro from $5/mo.',
+  description: 'Turn a connected Figma prototype into a polished demo, invite unlimited reviewers, and capture approval. Free to start; self-serve Studio from $5/month.',
   keywords: [
     'Figma prototype to video',
     'export Figma prototype to MP4',

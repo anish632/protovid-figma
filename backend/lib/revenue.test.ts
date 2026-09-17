@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getRefundedAmountCents, summarizeChargeRevenue } from './revenue.js';
+import { getRefundedAmountCents, summarizeChargeRevenue, subscriptionMonthlyRevenueCents } from './revenue.js';
+
+test('MRR normalizes annual and multi-month items and quantities, excluding trials', () => {
+  const subscription = { status: 'active', items: { data: [
+    { quantity: 2, price: { unit_amount: 500, recurring: { interval: 'month', interval_count: 1 } } },
+    { quantity: 1, price: { unit_amount: 39000, recurring: { interval: 'year', interval_count: 1 } } },
+    { price: { unit_amount: 1500, recurring: { interval: 'month', interval_count: 3 } } },
+  ] } };
+  assert.equal(subscriptionMonthlyRevenueCents(subscription), 4750);
+  assert.equal(subscriptionMonthlyRevenueCents({ ...subscription, status: 'trialing' }), 0);
+  assert.equal(subscriptionMonthlyRevenueCents({ ...subscription, status: 'canceled' }), 0);
+});
 
 test('revenue includes paid charges before subtracting a full refund once', () => {
   const summary = summarizeChargeRevenue([

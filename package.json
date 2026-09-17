@@ -1,6 +1,6 @@
 {
   "name": "protovid-figma",
-  "version": "1.3.16",
+  "version": "1.3.24",
   "description": "Professional Prototype Video Exporter for Figma",
   "scripts": {
     "build": "node build.js",

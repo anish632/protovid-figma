@@ -145,7 +145,7 @@ function freeProCompare(x, y) {
       </g>
       <g transform="translate(474, 0)">
         <rect width="430" height="250" rx="26" fill="#ffffff" opacity="0.96" />
-        <text x="36" y="60" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="900" fill="#0f172a">Pro delivery</text>
+        <text x="36" y="60" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="900" fill="#0f172a">Studio delivery</text>
         <rect x="36" y="88" width="358" height="124" rx="18" fill="#111827" />
         ${phone(88, 114, 'Home', '#bfdbfe')}
         ${phone(218, 114, 'Done', '#bbf7d0')}
@@ -221,9 +221,9 @@ function slideSuccess(iconData) {
 function slideFree(iconData) {
   return shell(`
     ${logo(iconData)}
-    ${tspans(['Start free with', '3 MP4 exports'], 120, 360, 76, 82)}
-    ${tspans(['Try the workflow with 3 free watermarked exports.', 'Upgrade when you need a client-ready file.'], 120, 560, 34, 46, 700, '#cbd5e1')}
-    ${pill(120, 705, '3 free exports/month')}
+    ${tspans(['Start free with', '1 MP4 export'], 120, 360, 76, 82)}
+    ${tspans(['Try the workflow with 1 free watermarked export.', 'Upgrade when you need a client-ready file.'], 120, 560, 34, 46, 700, '#cbd5e1')}
+    ${pill(120, 705, '1 free export/month')}
     ${pill(432, 705, '720p MP4', '#1f2937')}
     ${pill(620, 705, 'Watermarked', '#1f2937')}
     <g filter="url(#shadow)">
@@ -240,8 +240,8 @@ function slidePro(iconData) {
     ${pill(120, 705, 'No watermark')}
     ${pill(342, 705, '1080p / 4K', '#1f2937')}
     ${pill(568, 705, 'Unlimited exports', '#1f2937')}
-    <g filter="url(#shadow)">
-      ${freeProCompare(920, 460)}
+    <g filter="url(#shadow)" transform="translate(1040, 500) scale(0.9)">
+      ${freeProCompare(0, 0)}
     </g>
   `);
 }

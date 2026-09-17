@@ -14,7 +14,7 @@ export default async function SuccessPage({
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
       minHeight: '100vh',
       padding: '72px 24px',
-      background: 'linear-gradient(180deg, #08111f 0%, #111827 100%)',
+      background: '#0b0f0d',
       color: '#e5e7eb',
       textAlign: 'center',
     }}>
@@ -31,14 +31,14 @@ export default async function SuccessPage({
         }}>
           Payment status
         </div>
-        <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)', lineHeight: 1.02, letterSpacing: '-0.04em', margin: 0, color: '#fff' }}>
-          ProtoVid Pro is active.
+        <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)', lineHeight: 1.02, letterSpacing: 0, margin: 0, color: '#fff' }}>
+          Your ProtoVid access is active.
         </h1>
         <div style={{ marginTop: 18 }}>
           <SuccessConfirmation sessionId={sessionId} />
         </div>
         <p style={{ marginTop: 10, fontSize: 18, lineHeight: 1.7, color: '#cbd5e1' }}>
-          Return to Figma. The plugin will detect your payment automatically and unlock HD/4K, no watermark, and unlimited exports.
+          Return to Figma. The plugin will detect your payment automatically. Export the final walkthrough, create an approval room, and invite the first reviewer.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 28 }}>
           <Link href="/pricing" style={{
@@ -46,8 +46,8 @@ export default async function SuccessPage({
             alignItems: 'center',
             justifyContent: 'center',
             padding: '14px 22px',
-            borderRadius: 12,
-            background: '#7c6ef0',
+            borderRadius: 6,
+            background: '#167b45',
             color: '#fff',
             fontWeight: 700,
             textDecoration: 'none',
@@ -59,7 +59,7 @@ export default async function SuccessPage({
             alignItems: 'center',
             justifyContent: 'center',
             padding: '14px 22px',
-            borderRadius: 12,
+            borderRadius: 6,
             border: '1px solid rgba(255,255,255,0.12)',
             color: '#fff',
             fontWeight: 600,

@@ -1,0 +1,72 @@
+{
+  "fields": [
+    {
+      "name": "result",
+      "dataTypeID": 114,
+      "tableID": 0,
+      "columnID": 0,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    }
+  ],
+  "rows": [
+    {
+      "result": {
+        "periods": [
+          {
+            "period": "last30",
+            "opens": 298,
+            "exporters": 160,
+            "upgraders": 23,
+            "payers": 1
+          },
+          {
+            "period": "prior30",
+            "opens": 51,
+            "exporters": 23,
+            "upgraders": 2,
+            "payers": 3
+          }
+        ],
+        "repeat_exports": {
+          "exporters": 160,
+          "multiple_exporters": 21,
+          "multiple_day_exporters": 1
+        },
+        "versions": [
+          {
+            "plugin_version": "1.3.16",
+            "users": 50,
+            "latest": "2026-09-05T03:09:40.536894"
+          },
+          {
+            "plugin_version": "1.3.19",
+            "users": 13,
+            "latest": "2026-09-06T22:27:56.866251"
+          },
+          {
+            "plugin_version": "1.3.21",
+            "users": 9,
+            "latest": "2026-09-07T13:04:45.724101"
+          }
+        ],
+        "failures": [
+          {
+            "event_type": "export_failed",
+            "reason": "browser_encode_failed",
+            "events": 11
+          },
+          {
+            "event_type": "flow_detection_failed",
+            "reason": "no_connected_path",
+            "events": 211
+          }
+        ]
+      }
+    }
+  ],
+  "command": "SELECT",
+  "rowCount": 1,
+  "rowAsArray": false
+}

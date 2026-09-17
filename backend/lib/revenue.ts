@@ -14,6 +14,24 @@ export interface ChargeRevenueInput {
   refunded?: boolean;
 }
 
+export function subscriptionMonthlyRevenueCents(subscription: {
+  status: string;
+  items: { data: Array<{ quantity?: number | null; price: {
+    unit_amount: number | null;
+    recurring?: { interval: string; interval_count: number } | null;
+  } }> };
+}): number {
+  if (subscription.status !== 'active') return 0;
+  return subscription.items.data.reduce((sum, item) => {
+    const recurring = item.price.recurring;
+    if (!recurring || !item.price.unit_amount || recurring.interval_count <= 0) return sum;
+    const months = recurring.interval === 'year' ? 12 : recurring.interval === 'month' ? 1
+      : recurring.interval === 'week' ? 12 / 52 : recurring.interval === 'day' ? 12 / 365 : 0;
+    if (!months) return sum;
+    return sum + item.price.unit_amount * (item.quantity ?? 1) / (months * recurring.interval_count);
+  }, 0);
+}
+
 export interface ChargeRevenueSummary {
   paidChargeCount: number;
   refundedChargeCount: number;

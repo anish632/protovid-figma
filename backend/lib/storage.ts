@@ -5,6 +5,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import type { BillingState } from './billingState';
 
 function getDB() {
   if (!process.env.NEON_DATABASE_URL) {
@@ -23,6 +24,24 @@ export interface Subscription {
   exportsThisMonth: number;
   lastResetMonth: string;
   firstExportDate?: string;
+  billingState?: BillingState | null;
+}
+
+function mapSubscription(row: any): Subscription {
+  return {
+    email: row.email,
+    billingState: row.billingState || null,
+    tier: row.tier as 'free' | 'pro',
+    status: row.status as Subscription['status'],
+    stripeCustomerId: row.stripeCustomerId || undefined,
+    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
+    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
+    exportsThisMonth: Number(row.exportsThisMonth || 0),
+    lastResetMonth: row.lastResetMonth,
+    firstExportDate: row.firstExportDate
+      ? new Date(row.firstExportDate).toISOString().slice(0, 10)
+      : undefined,
+  };
 }
 
 export async function getSubscription(email: string): Promise<Subscription> {
@@ -32,6 +51,7 @@ export async function getSubscription(email: string): Promise<Subscription> {
   const result = await sql`
     SELECT 
       email,
+      billing_state as "billingState",
       tier,
       status,
       stripe_customer_id as "stripeCustomerId",
@@ -56,18 +76,7 @@ export async function getSubscription(email: string): Promise<Subscription> {
     };
   }
   
-  const row = result[0];
-  return {
-    email: row.email,
-    tier: row.tier as 'free' | 'pro',
-    status: row.status as any,
-    stripeCustomerId: row.stripeCustomerId || undefined,
-    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
-    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
-    exportsThisMonth: row.exportsThisMonth,
-    lastResetMonth: row.lastResetMonth,
-    firstExportDate: row.firstExportDate || undefined,
-  };
+  return mapSubscription(result[0]);
 }
 
 export async function setSubscription(email: string, data: Partial<Subscription>): Promise<void> {
@@ -118,6 +127,7 @@ export async function findSubscriptionByCustomerId(customerId: string): Promise<
   const result = await sql`
     SELECT 
       email,
+      billing_state as "billingState",
       tier,
       status,
       stripe_customer_id as "stripeCustomerId",
@@ -131,17 +141,7 @@ export async function findSubscriptionByCustomerId(customerId: string): Promise<
   
   if (result.length === 0) return null;
   
-  const row = result[0];
-  return {
-    email: row.email,
-    tier: row.tier as 'free' | 'pro',
-    status: row.status as any,
-    stripeCustomerId: row.stripeCustomerId || undefined,
-    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
-    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
-    exportsThisMonth: row.exportsThisMonth,
-    lastResetMonth: row.lastResetMonth,
-  };
+  return mapSubscription(result[0]);
 }
 
 export async function findSubscriptionBySubscriptionId(subscriptionId: string): Promise<Subscription | null> {
@@ -149,6 +149,7 @@ export async function findSubscriptionBySubscriptionId(subscriptionId: string): 
   const result = await sql`
     SELECT 
       email,
+      billing_state as "billingState",
       tier,
       status,
       stripe_customer_id as "stripeCustomerId",
@@ -162,38 +163,71 @@ export async function findSubscriptionBySubscriptionId(subscriptionId: string): 
   
   if (result.length === 0) return null;
   
-  const row = result[0];
-  return {
-    email: row.email,
-    tier: row.tier as 'free' | 'pro',
-    status: row.status as any,
-    stripeCustomerId: row.stripeCustomerId || undefined,
-    stripeSubscriptionId: row.stripeSubscriptionId || undefined,
-    currentPeriodEnd: row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toISOString() : undefined,
-    exportsThisMonth: row.exportsThisMonth,
-    lastResetMonth: row.lastResetMonth,
-  };
+  return mapSubscription(result[0]);
 }
 
-export async function incrementExportCount(email: string): Promise<Subscription> {
+export async function consumeFreeExport(
+  email: string,
+  limit: number,
+): Promise<Subscription | null> {
   const sql = getDB();
-  const sub = await getSubscription(email);
+  const normalized = email.toLowerCase().trim();
   const currentMonth = new Date().toISOString().slice(0, 7);
   const today = new Date().toISOString().slice(0, 10);
-  
-  // Reset exports if new month
-  if (sub.lastResetMonth !== currentMonth) {
-    sub.exportsThisMonth = 0;
-    sub.lastResetMonth = currentMonth;
-  }
-  
-  // Set first export date if not already set
-  if (!sub.firstExportDate) {
-    sub.firstExportDate = today;
-  }
-  
-  sub.exportsThisMonth += 1;
-  await setSubscription(email, sub);
-  
-  return sub;
+
+  // Quota validation and consumption happen in one statement. Concurrent
+  // requests cannot both pass the limit using a stale read.
+  const rows = await sql`
+    INSERT INTO protovid_subscriptions (
+      email,
+      tier,
+      status,
+      exports_this_month,
+      last_reset_month,
+      first_export_date,
+      updated_at
+    ) VALUES (
+      ${normalized},
+      ${'free'},
+      ${'active'},
+      ${1},
+      ${currentMonth},
+      ${today}::date,
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (email) DO UPDATE SET
+      exports_this_month = CASE
+        WHEN protovid_subscriptions.last_reset_month <> ${currentMonth} THEN 1
+        ELSE protovid_subscriptions.exports_this_month + 1
+      END,
+      last_reset_month = ${currentMonth},
+      first_export_date = COALESCE(protovid_subscriptions.first_export_date, ${today}::date),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE NOT (
+        protovid_subscriptions.tier = 'pro'
+        AND (protovid_subscriptions.status IN ('active', 'trialing') OR (
+          protovid_subscriptions.status = 'past_due'
+          AND billing_state->>'subscriptionId' = stripe_subscription_id
+          AND billing_state->>'kind' IN ('payment_failed', 'authentication_required')
+          AND (billing_state->>'graceEndsAt')::timestamptz > CURRENT_TIMESTAMP
+        ))
+      )
+      AND (
+        protovid_subscriptions.last_reset_month <> ${currentMonth}
+        OR protovid_subscriptions.exports_this_month < ${limit}
+      )
+    RETURNING
+      email,
+      billing_state as "billingState",
+      tier,
+      status,
+      stripe_customer_id as "stripeCustomerId",
+      stripe_subscription_id as "stripeSubscriptionId",
+      current_period_end as "currentPeriodEnd",
+      exports_this_month as "exportsThisMonth",
+      last_reset_month as "lastResetMonth",
+      first_export_date as "firstExportDate"
+  `;
+
+  return rows.length ? mapSubscription(rows[0]) : null;
 }

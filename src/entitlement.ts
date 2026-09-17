@@ -1,3 +1,5 @@
+import { getBillingNotice, type BillingNotice } from './billingNotice';
+
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'none';
 export type BillingAccessKind = 'subscription' | 'one_time_access' | 'none';
 
@@ -6,6 +8,7 @@ export interface EntitlementResponse {
   billingPeriodKey: string;
   subscriptionStatus: SubscriptionStatus;
   isPaid: boolean;
+  freeTierExperimentId?: string;
   freeExportsLimit: number;
   freeExportsUsed: number;
   freeExportsRemaining: number;
@@ -14,6 +17,7 @@ export interface EntitlementResponse {
   upgradeRequired: boolean;
   billingAccessKind?: BillingAccessKind;
   currentPeriodEnd?: string | null;
+  billingNotice?: BillingNotice | null;
 }
 
 export const ENTITLEMENT_VERIFICATION_ERROR = "Couldn't verify export allowance. Please try again.";
@@ -46,10 +50,16 @@ export function normalizeEntitlementResponse(input: unknown): EntitlementRespons
   }
 
   return {
+    billingNotice: value.billingNotice && typeof value.billingNotice.title === 'string'
+      && typeof value.billingNotice.message === 'string' && typeof value.billingNotice.actionLabel === 'string'
+      ? value.billingNotice : getBillingNotice(value.subscriptionStatus),
     userId: value.userId,
     billingPeriodKey: value.billingPeriodKey,
     subscriptionStatus: value.subscriptionStatus as SubscriptionStatus,
     isPaid: value.isPaid,
+    freeTierExperimentId: typeof value.freeTierExperimentId === 'string'
+      ? value.freeTierExperimentId
+      : undefined,
     freeExportsLimit: value.freeExportsLimit,
     freeExportsUsed: value.freeExportsUsed,
     freeExportsRemaining: value.freeExportsRemaining,

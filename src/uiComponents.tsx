@@ -72,6 +72,7 @@ interface AppHeaderProps {
   voiceError: string | null;
   onVoiceToggle: () => void;
   showUpgradePlan?: boolean;
+  upgradePlanLabel?: string;
   upgradePlanDisabled?: boolean;
   onUpgradePlan?: () => void;
 }
@@ -118,6 +119,7 @@ export function AppHeader({
   voiceError,
   onVoiceToggle,
   showUpgradePlan = false,
+  upgradePlanLabel = 'Buy Project Pass',
   upgradePlanDisabled = false,
   onUpgradePlan,
 }: AppHeaderProps) {
@@ -127,7 +129,7 @@ export function AppHeader({
         <img class="app-icon" src="__PROTOVID_ICON__" alt="" />
         <div class="brand-copy">
           <strong>ProtoVid</strong>
-          <span>Export video</span>
+          <span>Prototype walkthrough</span>
         </div>
       </div>
       <div class="header-actions">
@@ -138,7 +140,7 @@ export function AppHeader({
             onClick={onUpgradePlan}
             disabled={upgradePlanDisabled}
           >
-            Upgrade plan
+            {upgradePlanLabel}
           </button>
         ) : null}
         {voiceStatus !== 'unsupported' ? (
@@ -176,7 +178,7 @@ export function SectionCard({ title, eyebrow, action, children, class: className
 }
 
 export function PlanBadge({ pro, label }: { pro?: boolean; label?: string }) {
-  return <span class={`plan-badge ${pro ? 'plan-badge-pro' : 'plan-badge-free'}`}>{label || (pro ? 'Pro' : 'Free')}</span>;
+  return <span class={`plan-badge ${pro ? 'plan-badge-pro' : 'plan-badge-free'}`}>{label || (pro ? 'Studio' : 'Free')}</span>;
 }
 
 interface FlowPreviewProps {
@@ -389,12 +391,12 @@ export function UpgradeChoicePanel({
 }: UpgradeChoicePanelProps) {
   const primaryIsProjectPass = projectPassAvailable && projectPassFirst;
   const primaryLabel = primaryIsProjectPass
-    ? `Export clean HD/4K - ${projectPassLabel}`
-    : `Unlock clean HD/4K - ${monthlyLabel}`;
+    ? `Buy Project Pass - ${projectPassLabel}`
+    : `Start Studio - ${monthlyLabel}`;
   const secondaryLabel = primaryIsProjectPass
-    ? `Use recurring Pro - ${monthlyLabel}`
+    ? `Use Studio - ${monthlyLabel}`
     : projectPassAvailable
-      ? `Finish this project - ${projectPassLabel}`
+      ? `Buy Project Pass - ${projectPassLabel}`
       : '';
 
   return (
@@ -402,12 +404,12 @@ export function UpgradeChoicePanel({
       <div class="upgrade-choice-copy">
         <p class="section-eyebrow">Ready to deliver</p>
         <h2 id="upgrade-choice-heading">Make this walkthrough client-ready</h2>
-        <p>{frameCount} connected {frameCount === 1 ? 'frame' : 'frames'} · {estimatedDuration} · remove the watermark and export in HD/4K.</p>
+        <p>{frameCount} connected {frameCount === 1 ? 'frame' : 'frames'} · {estimatedDuration} · clean HD/4K export without a watermark.</p>
       </div>
       <div class="value-strip" aria-label="Upgrade benefits">
         <span><Icon name="check" size={14} />No watermark</span>
         <span><Icon name="check" size={14} />1080p and 4K</span>
-        <span><Icon name="check" size={14} />Client handoff</span>
+        <span><Icon name="check" size={14} />Approval room</span>
       </div>
       <button
         class="upgrade-cta"
@@ -427,8 +429,8 @@ export function UpgradeChoicePanel({
       )}
       <p class="stripe-note">
         {primaryIsProjectPass
-          ? `Project Pass is one-time access for this deadline. Pro is for recurring ${selectedResolution} client work.`
-          : 'Pro is for recurring client work. Project Pass is available for one deadline.'}
+          ? `Project Pass is one-time access for this deadline. Studio is for recurring ${selectedResolution} review workflows.`
+          : 'Studio is for recurring review workflows. Project Pass is available for one deadline.'}
       </p>
     </section>
   );
@@ -544,10 +546,10 @@ export function UpgradeCard({
     <section class="upgrade-card-compact" aria-labelledby="upgrade-heading">
       <span class="upgrade-accent" />
       <h2 id="upgrade-heading">Ready to ship this project?</h2>
-      <p>Re-export this walkthrough in HD or 4K without the watermark.</p>
+      <p>Remove the watermark and re-export in HD or 4K. Project Pass covers one client deadline — no subscription required.</p>
       <div class="plan-comparison">
-        <div><PlanBadge /><span>720p · Watermark · 3 exports/month</span></div>
-        <div><PlanBadge pro /><span>1080p and 4K · No watermark · Unlimited</span></div>
+        <div><PlanBadge /><span>720p · Watermark · 1 export/month</span></div>
+        <div><PlanBadge pro /><span>1080p and 4K · No watermark</span></div>
       </div>
       <button
         class="upgrade-cta"
@@ -555,8 +557,8 @@ export function UpgradeCard({
         onClick={projectPassFirst && onProjectPass ? onProjectPass : onMonthly}
       >
         {projectPassFirst
-          ? `Re-export clean for this project — ${projectPassLabel}`
-          : `Re-export clean in HD — ${monthlyLabel}`}
+          ? `Buy Project Pass — ${projectPassLabel}`
+          : `Start Studio — ${monthlyLabel}`}
       </button>
       {projectPassLabel && onProjectPass && (
         <button
@@ -564,10 +566,10 @@ export function UpgradeCard({
           type="button"
           onClick={projectPassFirst ? onMonthly : onProjectPass}
         >
-          {projectPassFirst ? `Ongoing Pro — ${monthlyLabel}` : `Project Pass — ${projectPassLabel}`}
+          {projectPassFirst ? `Studio — ${monthlyLabel}` : `Project Pass — ${projectPassLabel}`}
         </button>
       )}
-      {projectPassLabel && <p class="stripe-note">Project Pass includes 7 days of unlimited clean exports. No subscription.</p>}
+      {projectPassLabel && <p class="stripe-note">Project Pass includes 7 days of unlimited clean exports and review rooms. No subscription.</p>}
       <p class="stripe-note">Secure checkout powered by Stripe.</p>
     </section>
   );
@@ -591,7 +593,7 @@ export function PostSuccessEmailSave({
   return (
     <section class="post-success-email" aria-labelledby="post-success-email-heading">
       <h2 id="post-success-email-heading">Keep your exports on this account</h2>
-      <p>Add your email after two exports to keep your allowance connected and speed up Pro checkout later.</p>
+      <p>Add your email to keep your allowance connected and speed up checkout when a prototype needs approval-ready delivery.</p>
       <label class="field-label" for="success-account-email">Email address</label>
       <input
         id="success-account-email"
@@ -657,7 +659,7 @@ interface AccountMenuProps {
 export function AccountMenu({ isPro, canManage, onRestore, onUseAnotherEmail, onManage }: AccountMenuProps) {
   return (
     <details class="account-menu">
-      <summary><span>Account</span>{isPro && <PlanBadge pro label="Pro active" />}<Icon name="chevron" size={14} /></summary>
+      <summary><span>Account</span>{isPro && <PlanBadge pro label="Studio active" />}<Icon name="chevron" size={14} /></summary>
       <div class="account-menu-panel">
         {!isPro && <button type="button" onClick={onRestore}>Restore purchase</button>}
         <button type="button" onClick={onUseAnotherEmail}>Use another email</button>
@@ -671,22 +673,58 @@ interface EmptyStateProps {
   onRefresh: () => void;
   onClose: () => void;
   onOpenGuide: () => void;
+  onConnectExistingFrames: () => void;
+  unconnectedFrameCount: number;
+  onCreateExample: (slug: string, source: 'recommended' | 'example_picker') => void;
 }
 
-export function EmptyState({ onRefresh, onClose, onOpenGuide }: EmptyStateProps) {
+export function EmptyState({ onRefresh, onClose, onOpenGuide, onConnectExistingFrames, unconnectedFrameCount, onCreateExample }: EmptyStateProps) {
+  const examples: Array<[string, string]> = [
+    ['client-delivery', 'Client booking walkthrough'],
+    ['saas-walkthrough', 'SaaS task-planning demo'],
+    ['portfolio-case-study', 'Portfolio interaction'],
+  ];
+  const canAutoConnect = unconnectedFrameCount >= 2;
+
   return (
     <main class="state-screen empty-state" aria-labelledby="empty-heading">
       <div class="empty-preview" aria-hidden="true"><span /><i /><span /></div>
       <p class="state-eyebrow">1 · Detect</p>
       <h1 id="empty-heading">No connected prototype flow found</h1>
-      <p class="state-description">ProtoVid exports the connected path from a Figma prototype. Add at least one Prototype interaction, then refresh.</p>
+      <p class="state-description">Start with an editable, connected example to see a finished walkthrough, or connect your own frames in the Prototype tab.</p>
+      {canAutoConnect && (
+        <section class="setup-recommendation" aria-labelledby="autoconnect-heading">
+          <p class="section-eyebrow">FASTEST FIRST EXPORT</p>
+          <h2 id="autoconnect-heading">Export your {unconnectedFrameCount} frames now</h2>
+          <p>We’ll connect your existing frames left-to-right into one walkthrough, then export. You can rewire the order anytime in the Prototype tab.</p>
+          <button class="primary-action" type="button" onClick={onConnectExistingFrames}>
+            Connect {unconnectedFrameCount} frames &amp; export
+          </button>
+        </section>
+      )}
+      <section class="setup-recommendation" aria-labelledby="example-heading">
+        {!canAutoConnect && <p class="section-eyebrow">FASTEST FIRST EXPORT</p>}
+        <h2 id="example-heading">{canAutoConnect ? 'Or try a client-ready example' : 'Try a client-ready example'}</h2>
+        <p>We’ll create three connected, editable screens on a new page. Your current work stays untouched.</p>
+        <button class={canAutoConnect ? 'secondary-button' : 'primary-action'} type="button" onClick={() => onCreateExample('client-delivery', 'recommended')}>
+          Create client booking example
+        </button>
+      </section>
+      <details class="example-picker">
+        <summary>Choose a different example</summary>
+        <p>Each starts with three editable connected screens. Exporting uses your normal allowance.</p>
+        {examples.slice(1).map(([slug, label]) => <button class="secondary-button" type="button" key={slug} onClick={() => onCreateExample(slug, 'example_picker')}>{label}</button>)}
+      </details>
+      <details class="connect-your-own-flow">
+        <summary>Connect my own prototype instead</summary>
       <ol class="empty-instructions">
         <li>Select the frame where the walkthrough should start.</li>
         <li>Open the Prototype tab and drag the node to the next frame.</li>
         <li>Repeat for each screen you want in the exported path.</li>
       </ol>
-      <button class="primary-action" type="button" onClick={onRefresh}><Icon name="refresh" size={16} />Refresh flow</button>
-      <button class="secondary-button" type="button" onClick={onOpenGuide}>See a 20-second example</button>
+        <button class="secondary-button" type="button" onClick={onRefresh}><Icon name="refresh" size={16} />Refresh connected flow</button>
+      </details>
+      <button class="secondary-button" type="button" onClick={onOpenGuide}>Open the step-by-step guide</button>
       <button class="text-button centered" type="button" onClick={onClose}>Close ProtoVid</button>
     </main>
   );
@@ -751,33 +789,18 @@ export function SuccessActions({ downloadUrl, filename, onDownload, onAnother, o
   const anotherAction = actions.find(action => action.id === 'another')!;
   const copyAction = actions.find(action => action.id === 'copy')!;
   const shareLabel = shareState === 'creating'
-    ? 'Creating review link…'
+    ? 'Creating approval link…'
     : shareState === 'ready'
-      ? 'Copy review link'
+      ? 'Copy approval link'
       : shareAction.label;
 
-  if (reviewShareAvailable) {
-    return (
-      <div class="success-actions">
-        <button class="primary-action success-share-action" type="button" onClick={onShare} disabled={!shareAction.enabled || shareState === 'creating'}>
-          <Icon name="share" size={17} />
-          {shareLabel}
-        </button>
-        <a class="secondary-button success-download-action full-width" href={downloadUrl} download={filename} onClick={onDownload} aria-disabled={!downloadAction.enabled}><Icon name="download" size={15} />{downloadAction.label}</a>
-        <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another flow</button>
-        <div class="secondary-action-row">
-          <button class="text-button" type="button" onClick={onCopy}><Icon name="copy" size={14} />{copyAction.label}</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div class="success-actions">
       <a class="primary-action success-download-action" href={downloadUrl} download={filename} onClick={onDownload} aria-disabled={!downloadAction.enabled}><Icon name="download" size={17} />{downloadAction.label}</a>
-      <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another flow</button>
+      <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another</button>
       <div class="secondary-action-row">
-        <button class="secondary-button" type="button" onClick={onShare} disabled={!shareAction.enabled || shareState === 'creating'}>
+        <button class="secondary-button" type="button" onClick={onShare} disabled={!reviewShareAvailable || !shareAction.enabled || shareState === 'creating'}>
           <Icon name="share" size={15} />
           {shareLabel}
         </button>
@@ -813,7 +836,7 @@ export function ShareInvitePanel({
           <span class="share-invite-icon"><Icon name="share" size={15} /></span>
           <div>
             <h2 id="share-invite-heading">Invite reviewers</h2>
-            <p>Send this decision room with the export, review brief, timestamped feedback, and approval.</p>
+            <p>Send the approval room with the export, decision brief, timestamped feedback, and status.</p>
           </div>
         </div>
         <div class="share-link-row">

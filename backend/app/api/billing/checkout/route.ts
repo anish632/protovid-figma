@@ -23,8 +23,17 @@ export async function POST(request: NextRequest) {
       pricingPageExperimentId,
       pricingPageExperimentVariant,
     } = checkoutRequestSchema.parse(body);
-    const selectedPlan = plan === 'large_export' ? 'large_export' : 'monthly';
+    const selectedPlan = plan === 'large_export'
+      ? 'large_export'
+      : plan === 'yearly'
+        ? 'yearly'
+        : 'monthly';
     const existingSubscription = await getSubscription(email);
+
+    if (existingSubscription.stripeSubscriptionId && existingSubscription.status === 'past_due') {
+      return NextResponse.json({ error: 'Your existing subscription needs payment. Open billing to resolve it before starting another subscription.',
+        code: 'billing_recovery_required', url: `${process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://protovid.dasgroupllc.com'}/account` }, { status: 409 });
+    }
 
     // A paid entitlement includes an active subscription that is already set
     // to end at period close and a fixed-term Project Pass. Starting a
@@ -65,12 +74,13 @@ export async function POST(request: NextRequest) {
 
     if (!pricing) {
       return NextResponse.json(
-        { error: 'Project Pass is not available yet. Pro is available now.' },
+        { error: 'Project Pass is not available yet. Studio is available now.' },
         { status: 409 }
       );
     }
 
-    await recordEvent(email, 'pricing_variant_assigned', {
+    try {
+      await recordEvent(email, 'pricing_variant_assigned', {
       source: 'checkout',
       plan: selectedPlan,
       pricingVariant: pricing.id,
@@ -85,9 +95,14 @@ export async function POST(request: NextRequest) {
       ...(anonymousId ? { anonymousId } : {}),
     });
 
+    } catch (eventError) {
+      console.warn('Could not record pricing assignment:', eventError);
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || 'http://localhost:3000';
     const checkoutSession = await createCheckoutSession({
       priceId: pricing.priceId,
+      expectedPrice: { amountCents: pricing.amountCents, interval: selectedPlan === 'large_export' ? null : selectedPlan === 'yearly' ? 'year' : 'month' },
       customerEmail: email,
       successUrl: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${baseUrl}/pricing?canceled=true`,

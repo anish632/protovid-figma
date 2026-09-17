@@ -1,0 +1,54 @@
+{
+  "fields": [
+    {
+      "name": "json_build_object",
+      "dataTypeID": 114,
+      "tableID": 0,
+      "columnID": 0,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    }
+  ],
+  "rows": [
+    {
+      "json_build_object": {
+        "as_of": "2026-09-07T18:34:24.383586+00:00",
+        "matured_first_session_cohorts": [
+          {
+            "week": "2026-08-10T00:00:00",
+            "actors": 75,
+            "first_exports_within_7d": 38
+          },
+          {
+            "week": "2026-08-17T00:00:00",
+            "actors": 83,
+            "first_exports_within_7d": 45
+          },
+          {
+            "week": "2026-08-24T00:00:00",
+            "actors": 61,
+            "first_exports_within_7d": 38
+          },
+          {
+            "week": "2026-08-31T00:00:00",
+            "actors": 8,
+            "first_exports_within_7d": 2
+          }
+        ],
+        "ordered_upgrade_cohort": {
+          "upgraders": 17,
+          "checkout_creators": 3,
+          "confirmed_after_checkout": 1
+        },
+        "matured_repeat_cohort": {
+          "first_exporters": 120,
+          "returned_days_1_to_7": 1
+        }
+      }
+    }
+  ],
+  "command": "SELECT",
+  "rowCount": 1,
+  "rowAsArray": false
+}

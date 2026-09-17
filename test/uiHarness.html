@@ -49,6 +49,23 @@
       currentPeriodEnd: '2026-08-11T00:00:00.000Z',
     };
 
+    const billingKind = params.get('billing');
+    if (billingKind) {
+      const isGrace = billingKind === 'grace';
+      const canceled = billingKind === 'canceled';
+      const authentication = billingKind === 'authentication';
+      Object.assign(freeEntitlement, {
+        subscriptionStatus: canceled ? 'canceled' : 'past_due',
+        isPaid: isGrace, watermarkRequired: !isGrace, billingAccessKind: isGrace ? 'subscription' : 'none',
+        billingNotice: {
+          title: canceled ? 'Your paid subscription has ended' : authentication ? 'Bank verification needed' : 'Your renewal needs attention',
+          message: canceled ? 'You’re now on Free. Review any outstanding invoice in billing. Paying an old invoice does not automatically restart a canceled subscription.'
+            : `${authentication ? 'Complete your bank’s verification to finish your renewal.' : 'Review your payment method and unpaid invoice to finish your renewal.'} ${isGrace ? 'Paid features stay available until Sep 13, 2026, 12:00 PM UTC.' : 'Paid features are paused. You can still use Free.'}`,
+          actionLabel: canceled ? 'Review billing' : authentication ? 'Verify payment' : 'Fix payment',
+        },
+      });
+    }
+
     const path = {
       id: 'path:home>checkout>success',
       frameIds: Array.from({ length: frameCount }, (_, index) => `frame-${index + 1}`),
@@ -96,7 +113,7 @@
           mixedDimensions: previewState === 'mixed',
           pathEnumerationTruncated: false,
         },
-        savedEmail: isPro ? 'designer@example.com' : '',
+        savedEmail: isPro || billingKind ? 'designer@example.com' : '',
         pendingCheckout: null,
         entitlement: entitlementUnavailable ? null : isPro ? proEntitlement : freeEntitlement,
         entitlementError: entitlementUnavailable,
@@ -167,7 +184,9 @@
         }), 50);
       }
 
-      if (message.type === 'scan-prototype') {
+      if (message.type === 'create-example-prototype') window.__harnessStats.exampleSlug = message.data.slug;
+
+      if (message.type === 'scan-prototype' || message.type === 'create-example-prototype') {
         setTimeout(() => send('scan-complete', {
           frames: path.frameIds.map((id, index) => ({ id, name: index === 0 ? 'Home' : `Frame ${index + 1}`, width: 1440, height: 900 })),
           flow: initPayload().flow,
@@ -207,7 +226,7 @@
           pendingCheckoutEmail: '',
           pendingCheckoutPlan: '',
           checkoutState: 'success',
-          notice: 'Pro is active. Client-ready resolutions are now available.',
+          notice: 'Studio is active. Client-ready resolutions are now available.',
         }), 250);
       }
 

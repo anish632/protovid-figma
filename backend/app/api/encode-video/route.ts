@@ -7,6 +7,7 @@ import path from 'path';
 import ffmpeg from '@ffmpeg-installer/ffmpeg';
 import { trackExportUsage } from '@/lib/usageMonitoring';
 import { recordEvent } from '@/lib/events';
+import { mediaRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -34,6 +35,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = mediaRateLimit(request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const id = randomUUID();
   const inputPath = path.join('/tmp', `input-${id}.avi`);
   const outputPath = path.join('/tmp', `output-${id}.mp4`);

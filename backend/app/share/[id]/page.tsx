@@ -46,7 +46,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
         <section style={{ marginTop: 18, padding: 20, borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div style={{ maxWidth: 660 }}>
-              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a5b4fc' }}>On-platform review brief</div>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0, color: '#a5b4fc' }}>On-platform review brief</div>
               <h2 style={{ margin: '5px 0 0', color: '#fff', fontSize: 20 }}>Product decision context</h2>
               <p style={{ margin: '8px 0 0', color: '#cbd5e1', lineHeight: 1.6, fontSize: 14 }}>{share.decisionBrief.summary}</p>
             </div>
