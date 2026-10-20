@@ -21,30 +21,31 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '73',
     date: 'October 14, 2026',
     isoDate: '2026-10-14',
-    headline: 'Figma-led growth: one-click connect & export for disconnected pages',
+    headline: 'Send for review: a clearer, more measurable client-delivery flow',
     new: [
-      'Placeholder: describe a new capability shipped in this version.',
+      'The delivery loop is now measurable: MP4 exports record when the review call-to-action is seen, so we can tell a missed action apart from a weak offer.',
     ],
     improved: [
-      'Placeholder: describe something that got faster, clearer, or smoother.',
-    ],
-    fixed: [
-      'Placeholder: describe a bug this version resolves.',
+      'The post-export action is now “Send for review” (previously “Create approval link”), with copy that explains what a recipient can do, who owns approval, and the 7-day free / 30-day paid link lifetimes.',
+      'Repeat exports are now framed as “Export a revision,” making the saved-settings workflow easier to find.',
+      'Clearer promise throughout: turn Figma frames into a client-ready walkthrough without screen recording — following your connected prototype path or connecting unlinked frames left to right.',
     ],
   },
   {
     version: '72',
     date: 'September 29, 2026',
     isoDate: '2026-09-29',
-    headline: 'Frictionless checkout and a faster path to your first export',
+    headline: 'One-click checkout — no more pre-checkout email gate',
     new: [
-      'Placeholder: describe a new capability shipped in this version.',
+      'Creating a share or review link now feeds the growth loop, so the share → reviewer → install path can be measured end to end.',
     ],
     improved: [
-      'Placeholder: describe something that got faster, clearer, or smoother.',
+      'Upgrading now opens Stripe Checkout immediately — the inline email gate that stopped most upgrades before checkout is gone. Stripe collects the email, and returning buyers skip re-entering it.',
+      '“Export another” now shows a free user’s remaining allowance when they still have exports left, nudging another export within the same session.',
     ],
     fixed: [
-      'Placeholder: describe a bug this version resolves.',
+      'The “Rate on Figma Community” prompt is now a single step — previously a first “Yes, it saved me time” click was required and almost no one reached the rate button.',
+      'Backend transcode requests now report the correct plugin version instead of a stale hardcoded value.',
     ],
   },
 ];
