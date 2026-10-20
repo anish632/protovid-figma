@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProtoVid — X / Twitter post templates</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #e9edf2; color: #0f172a; padding: 40px 20px; line-height: 1.5;
+  }
+  .page-head { max-width: 620px; margin: 0 auto 28px; }
+  .page-head h1 { font-size: 22px; }
+  .page-head p { color: #475569; font-size: 14px; margin-top: 6px; }
+  .grid { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  /* Each .card is sized ~1.91:1-friendly and is what you screenshot. */
+  .card {
+    background: #fff; border: 1px solid #d7dde6; border-radius: 16px; padding: 22px 24px;
+    box-shadow: 0 6px 24px rgba(15,23,42,0.06);
+  }
+  .meta { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg,#7c6ef0,#ec4899); color:#fff; display:grid; place-items:center; font-weight:800; font-size:20px; }
+  .who strong { display: block; font-size: 15px; }
+  .who span { color: #64748b; font-size: 13px; }
+  .tweet { font-size: 16px; white-space: pre-wrap; }
+  .tweet .hl { color: #7c3aed; }
+  .media {
+    margin-top: 14px; border: 1px dashed #c3ccd9; border-radius: 14px; background: #f4f6fa;
+    aspect-ratio: 16 / 9; display: grid; place-items: center; color: #7a8699; font-size: 13px; text-align:center; padding: 12px;
+  }
+  .label { max-width: 620px; margin: 0 auto -10px; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #7c3aed; }
+  .tip { max-width: 620px; margin: 2px auto 0; font-size: 13px; color: #64748b; }
+  @media print { body { background:#fff; } .card { box-shadow:none; } .label,.tip,.page-head { color:#000; } }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>ProtoVid — X / Twitter post templates</h1>
+    <p>Screenshot each card, or copy the tweet text directly. Swap the <span style="color:#7c3aed">purple</span> bits.
+    Attach the real demo video where a dashed box appears. Keep the install link in the first reply, not the main tweet (reach penalty on outbound links).</p>
+  </div>
+
+  <div class="grid">
+
+    <div class="label">1 · Launch / update announcement</div>
+    <div class="tip">Use on a new Figma Community release. Pair with the changelog link in a reply.</div>
+    <div class="card">
+      <div class="meta"><div class="avatar">P</div><div class="who"><strong>ProtoVid</strong><span>@protovid</span></div></div>
+      <div class="tweet">New in ProtoVid <span class="hl">v73</span>: <span class="hl">one-click connect &amp; export for disconnected Figma pages</span>.
+
+No prototype wiring, no screen recording — pick your frames, hit export, get a clean MP4/WebM/GIF.
+
+Free in the Figma Community 👇</div>
+      <div class="media">[ Attach: 6–10s screen capture of frames → exported video ]</div>
+    </div>
+
+    <div class="label">2 · "Did you know?" tip</div>
+    <div class="tip">Evergreen. Good for scheduled recurring posts. Targets the "screen recording" pain.</div>
+    <div class="card">
+      <div class="meta"><div class="avatar">P</div><div class="who"><strong>ProtoVid</strong><span>@protovid</span></div></div>
+      <div class="tweet">Did you know you don't have to screen-record a Figma prototype to share it?
+
+Screen recordings catch your cursor, random notifications, and compress badly.
+
+ProtoVid renders the video straight from your frames — clean every time. 🎬</div>
+      <div class="media">[ Attach: side-by-side — jittery screen recording vs clean ProtoVid export ]</div>
+    </div>
+
+    <div class="label">3 · Short demo walkthrough</div>
+    <div class="tip">Let the video carry it. One line of context, nothing more.</div>
+    <div class="card">
+      <div class="meta"><div class="avatar">P</div><div class="who"><strong>ProtoVid</strong><span>@protovid</span></div></div>
+      <div class="tweet"><span class="hl">3 Figma frames → a client-ready walkthrough video</span> in about 20 seconds.
+
+Sound on 🔊</div>
+      <div class="media">[ Attach: full screen recording of the plugin — detect → configure → export → share link ]</div>
+    </div>
+
+    <div class="label">4 · Pain point → solution</div>
+    <div class="tip">Strongest for replies/quote-tweets on "how do you share prototypes with clients" posts.</div>
+    <div class="card">
+      <div class="meta"><div class="avatar">P</div><div class="who"><strong>ProtoVid</strong><span>@protovid</span></div></div>
+      <div class="tweet">Sending clients a Figma link means teaching them Figma.
+
+They click the wrong frame, get lost, and you're on a call explaining navigation.
+
+Send a <span class="hl">video</span> instead. They just press play — and comment on the exact second something looks off.</div>
+      <div class="media">[ Attach: the review link page with a timestamped comment visible ]</div>
+    </div>
+
+    <div class="label">5 · Use-case spotlight (portfolio)</div>
+    <div class="tip">Rotate the use case: client delivery, design reviews, portfolio, stakeholder decks.</div>
+    <div class="card">
+      <div class="meta"><div class="avatar">P</div><div class="who"><strong>ProtoVid</strong><span>@protovid</span></div></div>
+      <div class="tweet">Your portfolio shouldn't be static screenshots of interactive work.
+
+Export your Figma prototype as a looping <span class="hl">MP4 or GIF</span> and show the actual flow — motion, states, transitions.
+
+Takes a minute. Free plugin 👇</div>
+      <div class="media">[ Attach: looping GIF of a polished prototype flow ]</div>
+    </div>
+
+  </div>
+</body>
+</html>

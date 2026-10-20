@@ -1,8 +1,50 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getShare } from '@/lib/shareStorage';
 import ReviewRoom from './ReviewRoom';
 
 export const dynamic = 'force-dynamic';
+
+const SITE_URL = 'https://protovid.dasgroupllc.com';
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
+  const { id } = await params;
+  const share = await getShare(id).catch(() => null);
+
+  const title = share ? `${share.filename} — ProtoVid review` : 'ProtoVid review';
+  const description = share
+    ? `${share.frameCount} frames · ${share.resolution}. Watch the walkthrough and leave timestamped feedback — no Figma account needed.`
+    : 'Watch a Figma prototype walkthrough and leave timestamped feedback with ProtoVid.';
+  const ogImage = `${SITE_URL}/api/og?eyebrow=${encodeURIComponent('Prototype review')}&title=${encodeURIComponent(
+    share?.filename ?? 'ProtoVid review',
+  )}&subtitle=${encodeURIComponent(share ? `${share.frameCount} frames · ${share.resolution}` : '')}`;
+  const url = `${SITE_URL}/share/${id}`;
+
+  return {
+    metadataBase: new URL(SITE_URL),
+    title,
+    description,
+    // Review links are private share URLs; keep them out of search indexes
+    // while still unfurling richly on Slack/Twitter.
+    robots: { index: false, follow: false },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: 'ProtoVid',
+      type: 'video.other',
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
+  };
+}
 
 export default async function SharePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ owner?: string }> }) {
   const { id } = await params;
