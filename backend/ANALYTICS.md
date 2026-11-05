@@ -110,10 +110,10 @@ were assigned before the ship or who hit the fallback path.
 | `billing_management_token_issued` | A completed recurring purchase received a scoped billing-management link. |
 | `subscription_cancellation_scheduled` | Stripe accepted cancellation at period end. |
 
-The share loop is measured as `share_link_created` → `review_room_opened` →
-`review_comment_created` or `review_status_updated`. `review_feedback_positive`
-and `review_feedback_not_yet` measure the post-export review prompt, while
-`viral_growth_action` records a community/referral action. The
+The share loop is measured as `share_delivery_cta_viewed` → `share_link_created`
+→ `review_room_opened` → `review_comment_created` or `review_status_updated`.
+`review_feedback_positive` and `review_feedback_not_yet` measure the post-export
+review prompt, while `viral_growth_action` records a community/referral action. The
 `figma_install_clicked` action is an outbound click, not an installation.
 For referral redirects, `attribution_version=anonymous_outbound_v2` retains
 share and experiment context without attaching the creator's email or anonymous

@@ -213,7 +213,7 @@ export const licenseValidationRequestSchema = z.object({
 });
 
 export const checkoutRequestSchema = z.object({
-  email: emailSchema,
+  email: z.union([emailSchema, z.null()]).optional(),
   plan: z.enum(['monthly', 'yearly', 'large_export']).optional(),
   anonymousId: z.string().min(1).max(128).optional(),
   offerExperimentId: z.string().min(1).max(64).optional(),
