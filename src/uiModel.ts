@@ -326,7 +326,7 @@ export function getExportSummaryCopy({
 
 export const SUCCESS_ACTIONS = [
   { id: 'download', label: 'Download file', priority: 'primary' },
-  { id: 'share', label: 'Create approval link', priority: 'secondary' },
+  { id: 'share', label: 'Send for review', priority: 'secondary' },
   { id: 'another', label: 'Export another', priority: 'secondary' },
   { id: 'copy', label: 'Copy export details', priority: 'secondary' },
 ] as const;

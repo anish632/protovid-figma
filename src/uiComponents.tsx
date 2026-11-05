@@ -615,35 +615,23 @@ export function PostSuccessEmailSave({
 }
 
 interface ReviewPromptProps {
-  feedbackState: 'unasked' | 'helpful';
-  onHelpful: () => void;
   onReview: () => void;
   onDismiss: () => void;
 }
 
-export function ReviewPrompt({ feedbackState, onHelpful, onReview, onDismiss }: ReviewPromptProps) {
-  if (feedbackState === 'unasked') {
-    return (
-      <section class="review-prompt review-prompt-strong" aria-labelledby="review-heading">
-        <div class="review-copy">
-          <h2 id="review-heading">Did ProtoVid save you a screen recording?</h2>
-          <p>A quick answer helps us make prototype exports better.</p>
-        </div>
-        <div class="secondary-action-row">
-          <button class="secondary-button" type="button" onClick={onHelpful}>Yes, it saved me time</button>
-          <button class="text-button" type="button" onClick={onDismiss}>Not yet</button>
-        </div>
-      </section>
-    );
-  }
-
+export function ReviewPrompt({ onReview, onDismiss }: ReviewPromptProps) {
+  // Single step: the prior "Did it save you time?" gate blocked 100% of reviews
+  // (nobody clicked through), so surface the Community review CTA directly.
   return (
     <section class="review-prompt review-prompt-strong" aria-labelledby="review-heading">
       <div class="review-copy">
-        <h2 id="review-heading">Would you share that with other designers?</h2>
-        <p>Your Figma Community review helps other designers find ProtoVid.</p>
+        <h2 id="review-heading">Saved you a screen recording?</h2>
+        <p>A 10-second Figma Community review helps other designers find ProtoVid.</p>
       </div>
-      <button class="secondary-button" type="button" onClick={onReview}>Rate on Figma Community</button>
+      <div class="secondary-action-row">
+        <button class="secondary-button" type="button" onClick={onReview}>Rate on Figma Community</button>
+        <button class="text-button" type="button" onClick={onDismiss}>Not now</button>
+      </div>
     </section>
   );
 }
@@ -780,25 +768,26 @@ interface SuccessActionsProps {
   onShare: () => void;
   shareState: 'idle' | 'creating' | 'ready' | 'error';
   reviewShareAvailable: boolean;
+  anotherHint?: string;
 }
 
-export function SuccessActions({ downloadUrl, filename, onDownload, onAnother, onCopy, onShare, shareState, reviewShareAvailable }: SuccessActionsProps) {
+export function SuccessActions({ downloadUrl, filename, onDownload, onAnother, onCopy, onShare, shareState, reviewShareAvailable, anotherHint }: SuccessActionsProps) {
   const actions = getSuccessActions(Boolean(downloadUrl));
   const shareAction = actions.find(action => action.id === 'share')!;
   const downloadAction = actions.find(action => action.id === 'download')!;
   const anotherAction = actions.find(action => action.id === 'another')!;
   const copyAction = actions.find(action => action.id === 'copy')!;
   const shareLabel = shareState === 'creating'
-    ? 'Creating approval link…'
+    ? 'Preparing review link…'
     : shareState === 'ready'
-      ? 'Copy approval link'
+      ? 'Copy review link'
       : shareAction.label;
 
 
   return (
     <div class="success-actions">
       <a class="primary-action success-download-action" href={downloadUrl} download={filename} onClick={onDownload} aria-disabled={!downloadAction.enabled}><Icon name="download" size={17} />{downloadAction.label}</a>
-      <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export another</button>
+      <button class="secondary-button success-another-action full-width" type="button" onClick={onAnother}><Icon name="repeat" size={15} />Export a revision{anotherHint ? <span class="success-another-hint">{anotherHint}</span> : null}</button>
       <div class="secondary-action-row">
         <button class="secondary-button" type="button" onClick={onShare} disabled={!reviewShareAvailable || !shareAction.enabled || shareState === 'creating'}>
           <Icon name="share" size={15} />
@@ -835,8 +824,8 @@ export function ShareInvitePanel({
         <div class="share-invite-heading-row">
           <span class="share-invite-icon"><Icon name="share" size={15} /></span>
           <div>
-            <h2 id="share-invite-heading">Invite reviewers</h2>
-            <p>Send the approval room with the export, decision brief, timestamped feedback, and status.</p>
+            <h2 id="share-invite-heading">Send this walkthrough for review</h2>
+            <p>Share one browser link for the video, timestamped feedback, and a clear approval decision.</p>
           </div>
         </div>
         <div class="share-link-row">
@@ -862,7 +851,7 @@ export function ShareInvitePanel({
         </div>
         {nativeShareAvailable && <button class="share-native-button" type="button" onClick={onNativeShare}><Icon name="share" size={14} />Share from your device</button>}
       </div>
-      <p class="share-invite-note">The brief is generated by ProtoVid from this export. Anyone with the link can comment; only you can approve or request changes from the private owner link.</p>
+      <p class="share-invite-note">Anyone with the link can comment. Keep the private owner link to approve or request changes; free links expire after 7 days and paid links after 30 days.</p>
     </section>
   );
 }
