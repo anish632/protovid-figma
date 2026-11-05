@@ -1214,6 +1214,13 @@ async function handleValidateLicense(licenseKey: string) {
     : currentEntitlement;
 
   if (entitlement?.isPaid || isValid) {
+    // Anonymous checkout means no email was stored before payment. Persist the
+    // confirmed buyer's email (the license key is their email) so their access
+    // survives across sessions.
+    const licenseEmail = licenseKey.toLowerCase().trim();
+    if (licenseEmail.includes('@')) {
+      await saveEmail(licenseEmail);
+    }
     const savedEmail = await loadEmail();
     const pendingCheckout = await loadPendingCheckout();
     const pendingCheckoutMatchesSavedAccount = Boolean(
@@ -1238,19 +1245,24 @@ async function handleOpenCheckout(email: string, plan?: string, pricingMetadata:
   checkoutInProgress = true;
   try {
     const selectedPlan = plan === 'large_export' ? 'large_export' : 'monthly';
-    const normalizedEmail = email.toLowerCase().trim();
+    // Email is optional now — the plugin opens checkout without it and Stripe's
+    // hosted page collects it. We only reconcile local account state when the
+    // buyer already has an email on file.
+    const normalizedEmail = (email || '').toLowerCase().trim();
     const previousEmail = (await loadEmail())?.toLowerCase().trim();
-    if (previousEmail && previousEmail !== normalizedEmail) {
+    if (normalizedEmail && previousEmail && previousEmail !== normalizedEmail) {
       await clearBillingManagementCapability();
       await clearPendingCheckout();
     }
     trackEvent('checkout_start', { plan: selectedPlan, ...pricingMetadata });
     trackEvent('checkout_started', { plan: selectedPlan, ...pricingMetadata });
 
-    await saveEmail(normalizedEmail);
-    if (previousEmail !== normalizedEmail) {
-      trackEvent('email_captured', { source: 'checkout' });
-      if (!previousEmail) await trackOnboardingCompletedOnce({ source: 'checkout' });
+    if (normalizedEmail) {
+      await saveEmail(normalizedEmail);
+      if (previousEmail !== normalizedEmail) {
+        trackEvent('email_captured', { source: 'checkout' });
+        if (!previousEmail) await trackOnboardingCompletedOnce({ source: 'checkout' });
+      }
     }
 
     const anonymousIdForCheckout = await loadAnonymousId();
@@ -1258,7 +1270,7 @@ async function handleOpenCheckout(email: string, plan?: string, pricingMetadata:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: normalizedEmail,
+        email: normalizedEmail || null,
         plan: selectedPlan,
         anonymousId: anonymousIdForCheckout,
         offerExperimentId: pricingMetadata.offerExperimentId,

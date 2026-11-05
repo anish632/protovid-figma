@@ -131,7 +131,7 @@ test('primary action uses the requested Free and Pro copy', () => {
 test('successful export keeps file download as the primary action', () => {
   assert.deepEqual(getSuccessActions(true).slice(0, 2), [
     { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
-    { id: 'share', label: 'Create approval link', priority: 'secondary', enabled: true },
+    { id: 'share', label: 'Send for review', priority: 'secondary', enabled: true },
   ]);
 });
 
@@ -341,7 +341,7 @@ test('unknown diagnostics are mapped to safe copy without exposing backend detai
 test('success-state actions make file download primary while keeping review sharing available', () => {
   assert.deepEqual(getSuccessActions(true), [
     { id: 'download', label: 'Download file', priority: 'primary', enabled: true },
-    { id: 'share', label: 'Create approval link', priority: 'secondary', enabled: true },
+    { id: 'share', label: 'Send for review', priority: 'secondary', enabled: true },
     { id: 'another', label: 'Export another', priority: 'secondary', enabled: true },
     { id: 'copy', label: 'Copy export details', priority: 'secondary', enabled: true },
   ]);

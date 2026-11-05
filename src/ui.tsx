@@ -380,6 +380,7 @@ function App() {
   const demoStateTrackedRef = useRef(false);
   const limitPaywallViewedRef = useRef(false);
   const postExportUpsellTrackedRef = useRef<string | null>(null);
+  const shareDeliveryCtaTrackedRef = useRef<string | null>(null);
   const postSuccessEmailPromptTrackedRef = useRef(false);
   const postSuccessEmailDismissedRef = useRef(false);
   // Users who never get a prototype detected re-refresh several times (median 6
@@ -1034,7 +1035,7 @@ function App() {
             checkoutState: 'pending'
           }));
           // Start auto-polling for payment completion
-          startPaymentPolling(msg.data.email, msg.data.plan || '');
+          startPaymentPolling(msg.data.email, msg.data.plan || '', msg.data.sessionId || '');
           break;
 
         case 'free-limit-reached':
@@ -1252,6 +1253,16 @@ function App() {
   }, [state.stage, state.isPremium, state.videoUrl, state.activeExportFrameCount, state.activeExportAttemptId, state.frameCount, state.entitlement, state.pricingVariant, state.monthlyPriceLabel, state.monthlyAmountCents, state.offerExperimentId, state.offerExperimentVariant, state.primaryOffer]);
 
   useEffect(() => {
+    if (state.stage !== 'complete' || !state.videoUrl || state.settings.format !== 'mp4' || shareDeliveryCtaTrackedRef.current === state.videoUrl) return;
+    shareDeliveryCtaTrackedRef.current = state.videoUrl;
+    trackUiEvent('share_delivery_cta_viewed', {
+      source: 'success_screen',
+      frameCount: state.activeExportFrameCount || state.frameCount,
+      isPremium: state.isPremium,
+    });
+  }, [state.stage, state.videoUrl, state.settings.format, state.activeExportFrameCount, state.frameCount, state.isPremium]);
+
+  useEffect(() => {
     // Most free users export only once, so gating the email prompt at 2+
     // exports meant it almost never appeared. Ask after any successful export
     // (the user has already gotten value); a dismiss ref still prevents
@@ -1277,7 +1288,7 @@ function App() {
   }, [state.stage, state.isPremium, state.userEmail, state.entitlement, state.activeExportFrameCount, state.frameCount, state.activeExportAttemptId]);
 
   // Auto-poll for payment completion after checkout
-  const startPaymentPolling = (email: string, plan: CheckoutPlan | '' = '') => {
+  const startPaymentPolling = (email: string, plan: CheckoutPlan | '' = '', sessionId = '') => {
     stopPaymentPolling();
     const pollGeneration = pollGenerationRef.current;
     const confirmedPlan: CheckoutPlan = plan === 'large_export' ? 'large_export' : 'monthly';
@@ -1288,7 +1299,7 @@ function App() {
         type: 'track-event',
         data: {
           eventType: 'payment_poll_started',
-          metadata: { source: 'plugin_poll', plan: confirmedPlan }
+          metadata: { source: sessionId ? 'session_confirm' : 'plugin_poll', plan: confirmedPlan }
         }
       }
     }, '*');
@@ -1306,6 +1317,30 @@ function App() {
       return true;
     };
 
+    const settlePaymentConfirmed = (confirmedEmail: string, source: string) => {
+      if (!finishCurrentPoll()) return;
+      trackUiEvent('payment_completed', { source, plan: confirmedPlan });
+      trackUiEvent('payment_confirmed', { source, plan: confirmedPlan });
+      setState(prev => ({
+        ...prev,
+        stage: 'setup',
+        isPremium: true,
+        userEmail: confirmedEmail || prev.userEmail,
+        error: null,
+        paymentCheckAvailable: false,
+        pendingCheckoutUrl: '',
+        pendingCheckoutEmail: '',
+        pendingCheckoutPlan: '',
+        pendingCheckoutSessionId: '',
+        checkoutState: 'success',
+        notice: getPaidAccessActivatedNotice(confirmedPlan),
+      }));
+      // Notify plugin code so it persists the account email and entitlement.
+      parent.postMessage({
+        pluginMessage: { type: 'validate-license', data: { licenseKey: confirmedEmail } }
+      }, '*');
+    };
+
     timerId = window.setInterval(async () => {
       if (pollGenerationRef.current !== pollGeneration || requestInFlight) return;
 
@@ -1313,6 +1348,30 @@ function App() {
       attempts++;
 
       try {
+        // Prefer sessionId confirmation: it works even when we never collected an
+        // email up front (Stripe captured it on the hosted checkout page).
+        if (sessionId) {
+          const response = await fetch(`${BACKEND_URL}/api/billing/confirm-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId })
+          });
+          if (pollGenerationRef.current !== pollGeneration) return;
+          if (response.ok) {
+            const data = await response.json();
+            const confirmedEmail = typeof data.email === 'string' ? data.email : '';
+            if (data.confirmed && confirmedEmail) {
+              settlePaymentConfirmed(confirmedEmail, 'session_confirm');
+              return;
+            }
+          }
+        }
+
+        // Email fallback: returning buyers, or checkouts resumed without a
+        // sessionId, are still detected by validating the known account email.
+        if (!email) {
+          return;
+        }
         const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1323,27 +1382,7 @@ function App() {
           const data = await response.json();
           if (pollGenerationRef.current !== pollGeneration) return;
           if (data.valid && data.tier === 'pro') {
-            // Payment confirmed!
-            if (!finishCurrentPoll()) return;
-            trackUiEvent('payment_completed', { source: 'plugin_poll', plan: confirmedPlan });
-            trackUiEvent('payment_confirmed', { source: 'plugin_poll', plan: confirmedPlan });
-            setState(prev => ({
-              ...prev,
-              stage: 'setup',
-              isPremium: true,
-              error: null,
-              paymentCheckAvailable: false,
-              pendingCheckoutUrl: '',
-              pendingCheckoutEmail: '',
-              pendingCheckoutPlan: '',
-              pendingCheckoutSessionId: '',
-              checkoutState: 'success',
-              notice: getPaidAccessActivatedNotice(confirmedPlan),
-            }));
-            // Notify plugin code
-            parent.postMessage({
-              pluginMessage: { type: 'validate-license', data: { licenseKey: email } }
-            }, '*');
+            settlePaymentConfirmed(email, 'plugin_poll');
             return;
           }
         }
@@ -1389,7 +1428,7 @@ function App() {
       ...prev,
       stage: checkoutReturnStageRef.current === 'complete' ? 'complete' : 'setup',
       error: null,
-      paymentCheckAvailable: !!prev.userEmail,
+      paymentCheckAvailable: !!(prev.userEmail || prev.pendingCheckoutSessionId),
       checkoutState: 'cancelled',
       notice: 'Checkout was not confirmed. Your flow and settings are unchanged.'
     }));
@@ -1565,41 +1604,9 @@ function App() {
       free_tier_experiment_id: state.entitlement?.freeTierExperimentId || null,
       frameCount: selectedPathFrameCount
     });
-    if (!isValidAccountEmail(email)) {
-      if (fromEmailPrompt) {
-        trackUiEvent('checkout_email_validation_failed', { source, plan, reason: 'invalid_email' });
-      }
-      // Reveal the inline email field instead of blocking — we only need an
-      // email to attach the subscription, collected right at checkout.
-      setNeedEmail(true);
-      setEmailIntent('checkout');
-      checkoutReturnStageRef.current = state.stage;
-      focusEmailCapture();
-      setState(prev => ({ ...prev, error: null }));
-      parent.postMessage({
-        pluginMessage: {
-          type: 'track-event',
-          data: {
-            eventType: 'checkout_email_prompt_shown',
-            metadata: {
-              trigger: freeUsed ? 'free_limit' : 'upgrade_cta',
-              source,
-              plan,
-              pricingVariant: state.pricingVariant,
-              priceLabel: isLargeFlowPass ? state.largeFlowPassLabel : state.monthlyPriceLabel,
-              amountCents: isLargeFlowPass ? state.largeFlowPassAmountCents : state.monthlyAmountCents,
-              offer_experiment_id: state.offerExperimentId,
-              offer_experiment_variant: state.offerExperimentVariant,
-              primary_offer: state.primaryOffer,
-              freeLimit: state.entitlement?.freeExportsLimit ?? null,
-              free_tier_experiment_id: state.entitlement?.freeTierExperimentId || null,
-              frameCount: selectedPathFrameCount
-            }
-          }
-        }
-      }, '*');
-      return;
-    }
+    // No email gate: open checkout immediately. Stripe's hosted page collects the
+    // email, and payment is detected by checkout sessionId. An already-known email
+    // is passed through so returning buyers skip re-entering it.
     setNeedEmail(false);
     checkoutRequestLockedRef.current = true;
     checkoutReturnStageRef.current = state.stage;
@@ -1608,7 +1615,7 @@ function App() {
       pluginMessage: {
         type: 'open-checkout',
         data: {
-          email,
+          email: isValidAccountEmail(email) ? email : '',
           plan,
           pricingVariant: state.pricingVariant,
           priceLabel: isLargeFlowPass ? state.largeFlowPassLabel : state.monthlyPriceLabel,
@@ -1646,17 +1653,21 @@ function App() {
         }
       }
     }, '*');
-    if (state.pendingCheckoutEmail || state.userEmail) {
+    if (state.pendingCheckoutEmail || state.userEmail || state.pendingCheckoutSessionId) {
       startPaymentPolling(
         state.pendingCheckoutEmail || state.userEmail,
         state.pendingCheckoutPlan || '',
+        state.pendingCheckoutSessionId || '',
       );
     }
   };
 
   const handleManualPaymentCheck = () => {
     const email = state.userEmail;
-    if (!email || !email.includes('@')) return;
+    const sessionId = state.pendingCheckoutSessionId;
+    // With anonymous checkout there may be no email yet; a pending sessionId is
+    // enough to confirm payment.
+    if ((!email || !email.includes('@')) && !sessionId) return;
     parent.postMessage({
       pluginMessage: {
         type: 'track-event',
@@ -1667,7 +1678,7 @@ function App() {
       }
     }, '*');
     setState(prev => ({ ...prev, stage: 'checking-payment', paymentCheckAvailable: false }));
-    startPaymentPolling(email, state.pendingCheckoutPlan || '');
+    startPaymentPolling(email, state.pendingCheckoutPlan || '', sessionId || '');
   };
 
   const handleClosePlugin = () => {
@@ -1943,14 +1954,6 @@ function App() {
     if (primaryAction.intent === 'refresh') handleScanPrototype();
   };
 
-  const handleReviewHelpful = () => {
-    setReviewFeedback('helpful');
-    trackUiEvent('review_feedback_positive', {
-      frameCount: completedExportFrameCount,
-      attempt_id: state.activeExportAttemptId,
-    });
-  };
-
   const handleReviewDismiss = () => {
     setReviewFeedback('dismissed');
     trackUiEvent('review_feedback_not_yet', {
@@ -2045,7 +2048,7 @@ function App() {
   const handleCreateShareLink = async () => {
     if (!state.videoUrl || state.shareState === 'creating') return;
     if (state.settings.format !== 'mp4') {
-      setState(prev => ({ ...prev, notice: 'Client review links currently support MP4 exports. Download this file or switch to MP4 to share a review room.' }));
+      setState(prev => ({ ...prev, notice: 'Review links currently support MP4 exports. Download this file or switch to MP4 to send a review link.' }));
       return;
     }
     const experimentVariant = getShareExperimentVariant(state.anonymousId);
@@ -2107,8 +2110,16 @@ function App() {
       }
 
       await copyText(data.url);
-      setState(prev => ({ ...prev, shareUrl: data.url, ownerShareUrl: typeof data.ownerUrl === 'string' ? data.ownerUrl : null, shareState: 'ready', notice: 'Approval link copied. It includes the video, decision brief, comments, and status.' }));
+      setState(prev => ({ ...prev, shareUrl: data.url, ownerShareUrl: typeof data.ownerUrl === 'string' ? data.ownerUrl : null, shareState: 'ready', notice: 'Review link copied. Invite a client or stakeholder to leave timestamped feedback.' }));
+      trackUiEvent('share_link_created', { source: 'success_screen', variant: experimentVariant });
       trackUiEvent('share_link_copied', { source: 'success_screen', reused: false, variant: experimentVariant });
+      // A shared link puts ProtoVid in front of reviewers who never installed it —
+      // count it as a viral action so the loop is measurable.
+      trackUiEvent('viral_growth_action', {
+        action: 'share_link_created',
+        source: 'success_screen',
+        variant: experimentVariant,
+      });
       trackUiEvent('review_invite_panel_shown', { source: 'success_screen', variant: experimentVariant });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create a share link.';
@@ -2613,7 +2624,7 @@ function App() {
 
               {emailCapturePanel && <SectionCard title="Account">{emailCapturePanel}</SectionCard>}
 
-              {state.paymentCheckAvailable && state.userEmail && (
+              {state.paymentCheckAvailable && (state.userEmail || state.pendingCheckoutSessionId) && (
                 <section class="checkout-recovery" aria-label="Pending checkout">
                   <div><strong>Finish checkout when ready</strong><span>Your flow, resolution, and path are saved.</span></div>
                   <div class="recovery-actions">
@@ -2677,6 +2688,9 @@ function App() {
               onShare={handleCreateShareLink}
               shareState={state.shareState}
               reviewShareAvailable={state.settings.format === 'mp4'}
+              anotherHint={!state.isPremium && remainingExports > 0
+                ? getRemainingExportsCopy(remainingExports, 'free')
+                : undefined}
             />
             {state.shareUrl && (
               <ShareInvitePanel
@@ -2701,8 +2715,6 @@ function App() {
             )}
             {shouldShowReview && reviewFeedback !== 'dismissed' && !collectEmail && (
               <ReviewPrompt
-                feedbackState={reviewFeedback === 'helpful' ? 'helpful' : 'unasked'}
-                onHelpful={handleReviewHelpful}
                 onReview={handleOpenCommunityListing}
                 onDismiss={handleReviewDismiss}
               />

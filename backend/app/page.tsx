@@ -3,8 +3,8 @@ import MarketingLanding from './MarketingLanding';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://protovid.dasgroupllc.com'),
-  title: 'Figma Prototype to Product Demo Video — ProtoVid',
-  description: 'Turn a connected Figma prototype into a polished demo, invite unlimited reviewers, and capture approval. Free to start; self-serve Studio from $5/month.',
+  title: 'Turn Figma Frames into Client Walkthrough Videos — ProtoVid',
+  description: 'Connect unlinked Figma frames in one click and export a client-ready walkthrough video. Free to start; self-serve plans from $4.',
   keywords: [
     'Figma prototype to video',
     'export Figma prototype to MP4',
@@ -37,8 +37,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Figma Prototype to Product Demo Video — ProtoVid',
-    description: 'Export a clean product demo from a connected Figma prototype flow without screen recording or video editing. MP4, WebM, and GIF output with optional review rooms.',
+    title: 'Turn Figma Frames into Client Walkthrough Videos — ProtoVid',
+    description: 'Connect unlinked Figma frames in one click, then export a client-ready MP4, WebM, or GIF walkthrough without screen recording.',
     url: 'https://protovid.dasgroupllc.com/',
     siteName: 'ProtoVid',
     type: 'website',
@@ -51,9 +51,9 @@ export const metadata: Metadata = {
     }],
   },
   twitter: {
-    card: 'summary',
-    title: 'Figma Prototype to Product Demo Video — ProtoVid',
-    description: 'Export a clean product demo from a connected Figma prototype flow without screen recording or video editing.',
+    card: 'summary_large_image',
+    title: 'Turn Figma Frames into Client Walkthrough Videos — ProtoVid',
+    description: 'Connect unlinked Figma frames in one click, then export a client-ready video without screen recording.',
     images: ['https://protovid.dasgroupllc.com/logo128x128.png'],
   },
 };

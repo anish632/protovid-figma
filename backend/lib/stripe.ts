@@ -21,7 +21,7 @@ export function getStripe(): Stripe {
 
 export async function createCheckoutSession(params: {
   priceId: string;
-  customerEmail: string;
+  customerEmail?: string;
   successUrl: string;
   cancelUrl: string;
   mode?: 'subscription' | 'payment';
@@ -47,7 +47,7 @@ export async function createCheckoutSession(params: {
 
 export function buildCheckoutSessionParams(params: {
   priceId: string;
-  customerEmail: string;
+  customerEmail?: string;
   successUrl: string;
   cancelUrl: string;
   mode?: 'subscription' | 'payment';
@@ -64,14 +64,15 @@ export function buildCheckoutSessionParams(params: {
       },
     ],
     mode,
-    customer_email: params.customerEmail,
+    // When no email is supplied, Stripe Checkout collects it on the hosted page.
+    ...(params.customerEmail ? { customer_email: params.customerEmail } : {}),
     allow_promotion_codes: true,
     billing_address_collection: 'auto',
     tax_id_collection: { enabled: true },
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     metadata: {
-      email: params.customerEmail,
+      ...(params.customerEmail ? { email: params.customerEmail } : {}),
       trial_days: String(params.trialDays || 0),
       ...params.metadata,
     },

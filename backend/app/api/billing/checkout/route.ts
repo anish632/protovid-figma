@@ -28,41 +28,47 @@ export async function POST(request: NextRequest) {
       : plan === 'yearly'
         ? 'yearly'
         : 'monthly';
-    const existingSubscription = await getSubscription(email);
 
-    if (existingSubscription.stripeSubscriptionId && existingSubscription.status === 'past_due') {
-      return NextResponse.json({ error: 'Your existing subscription needs payment. Open billing to resolve it before starting another subscription.',
-        code: 'billing_recovery_required', url: `${process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://protovid.dasgroupllc.com'}/account` }, { status: 409 });
-    }
+    // Email is now optional: the plugin opens checkout without collecting it and
+    // Stripe's hosted page captures it. The duplicate-charge guardrails below only
+    // apply when we already know the buyer's email (returning customer).
+    if (email) {
+      const existingSubscription = await getSubscription(email);
 
-    // A paid entitlement includes an active subscription that is already set
-    // to end at period close and a fixed-term Project Pass. Starting a
-    // second Checkout session here creates duplicate charges and makes the
-    // customer's access state ambiguous.
-    if (hasActivePaidEntitlement(existingSubscription)) {
-      const billingAccessType = getBillingAccessType(existingSubscription);
-      try {
-        await recordEvent(email, 'checkout_blocked_active_entitlement', {
-          source: 'checkout',
-          plan: selectedPlan,
-          billing_access_type: billingAccessType,
-          current_period_end: existingSubscription.currentPeriodEnd || null,
-        });
-      } catch (eventError) {
-        console.warn('Could not record blocked checkout event:', eventError);
+      if (existingSubscription.stripeSubscriptionId && existingSubscription.status === 'past_due') {
+        return NextResponse.json({ error: 'Your existing subscription needs payment. Open billing to resolve it before starting another subscription.',
+          code: 'billing_recovery_required', url: `${process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://protovid.dasgroupllc.com'}/account` }, { status: 409 });
       }
 
-      return NextResponse.json(
-        {
-          error: billingAccessType === 'subscription'
-            ? 'You already have an active ProtoVid subscription. Manage it in Stripe instead of starting another checkout.'
-            : 'You already have active non-recurring ProtoVid access. It does not need another checkout yet.',
-          code: 'active_entitlement',
-          billingAccessType,
-          currentPeriodEnd: existingSubscription.currentPeriodEnd || null,
-        },
-        { status: 409 }
-      );
+      // A paid entitlement includes an active subscription that is already set
+      // to end at period close and a fixed-term Project Pass. Starting a
+      // second Checkout session here creates duplicate charges and makes the
+      // customer's access state ambiguous.
+      if (hasActivePaidEntitlement(existingSubscription)) {
+        const billingAccessType = getBillingAccessType(existingSubscription);
+        try {
+          await recordEvent(email, 'checkout_blocked_active_entitlement', {
+            source: 'checkout',
+            plan: selectedPlan,
+            billing_access_type: billingAccessType,
+            current_period_end: existingSubscription.currentPeriodEnd || null,
+          });
+        } catch (eventError) {
+          console.warn('Could not record blocked checkout event:', eventError);
+        }
+
+        return NextResponse.json(
+          {
+            error: billingAccessType === 'subscription'
+              ? 'You already have an active ProtoVid subscription. Manage it in Stripe instead of starting another checkout.'
+              : 'You already have active non-recurring ProtoVid access. It does not need another checkout yet.',
+            code: 'active_entitlement',
+            billingAccessType,
+            currentPeriodEnd: existingSubscription.currentPeriodEnd || null,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const largeFlowPass = selectedPlan === 'large_export'
@@ -70,7 +76,7 @@ export async function POST(request: NextRequest) {
       : null;
     const pricing = selectedPlan === 'large_export'
       ? largeFlowPass
-      : getPricingVariantWithPriceId(email, selectedPlan);
+      : getPricingVariantWithPriceId(email || '', selectedPlan);
 
     if (!pricing) {
       return NextResponse.json(
@@ -80,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await recordEvent(email, 'pricing_variant_assigned', {
+      await recordEvent(email || null, 'pricing_variant_assigned', {
       source: 'checkout',
       plan: selectedPlan,
       pricingVariant: pricing.id,
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await createCheckoutSession({
       priceId: pricing.priceId,
       expectedPrice: { amountCents: pricing.amountCents, interval: selectedPlan === 'large_export' ? null : selectedPlan === 'yearly' ? 'year' : 'month' },
-      customerEmail: email,
+      customerEmail: email || undefined,
       successUrl: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${baseUrl}/pricing?canceled=true`,
       mode: selectedPlan === 'large_export' ? 'payment' : 'subscription',
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      await recordEvent(email, 'checkout_created', {
+      await recordEvent(email || null, 'checkout_created', {
         source: 'stripe_checkout_api',
         plan: selectedPlan,
         pricing_variant: pricing.id,

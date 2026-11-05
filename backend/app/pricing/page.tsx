@@ -195,7 +195,7 @@ export default function PricingPage() {
               </div>
               <div style={{ marginTop: 8, color: '#fff', fontSize: 34, fontWeight: 900 }}>{studioOffer.label}</div>
               <p style={{ minHeight: 50, color: '#c6d4ca', lineHeight: 1.55 }}>For a creator delivering new walkthroughs and revisions every month.</p>
-              {['Unlimited video exports', '1080p and 4K, no watermark', '30-day approval rooms', 'Unlimited external reviewers', 'View, comment, and status analytics'].map(item => (
+              {['Approval rooms stay live for a full year', 'Review links and comments never expire at 30 days', 'Unlimited video exports, 1080p and 4K, no watermark', 'Unlimited external reviewers', 'View, comment, and status analytics'].map(item => (
                 <p key={item} style={{ margin: '9px 0', color: '#e0e9e2', fontSize: 14 }}>✓ {item}</p>
               ))}
             </section>

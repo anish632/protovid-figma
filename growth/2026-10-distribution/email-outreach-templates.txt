@@ -1,0 +1,99 @@
+PROTOVID — OUTREACH TEMPLATES (plain text)
+==========================================
+Keep them plain text, short, and specific. Personalize the first line every
+time — the [BRACKETED] bits are mandatory swaps, not optional. Never send with
+a placeholder still in the body. Links: use the Figma Community URL directly
+(https://www.figma.com/community/plugin/1606994616321079154) or a tracked
+/api/referrals/figma?source=... link if you want attribution.
+
+
+============================================================
+1) COLD OUTREACH — DESIGN TOOL NEWSLETTER / PUBLICATION AUTHORS
+   (e.g. Dense Discovery, Sidebar, Smashing Magazine)
+============================================================
+Subject: A Figma plugin for your tools roundup — prototype → video
+
+Hi [FIRST NAME],
+
+I read [NEWSLETTER/PUBLICATION] regularly — [ONE SPECIFIC, GENUINE REFERENCE:
+a recent issue, link, or tool you featured]. The way you surface [CATEGORY,
+e.g. "small, well-made design utilities"] is why I'm reaching out.
+
+I built ProtoVid, a Figma plugin that exports connected prototypes to video
+(MP4/WebM/GIF) — no screen recording, so there's no cursor, notifications, or
+quality drift. Designers use it for client delivery, design reviews, and
+portfolio pieces.
+
+It's free to try, ~1,500 designers are on it, and there's nothing to sign up
+for to test it. If it's a fit for a tools section, I'm happy to send a 15-second
+demo clip or a short write-up in whatever format you prefer — no pressure
+either way.
+
+Plugin: https://www.figma.com/community/plugin/1606994616321079154
+
+Thanks for the work you put into [NEWSLETTER],
+[YOUR NAME]
+
+
+============================================================
+2) COLD OUTREACH — YOUTUBE CREATORS WHO MAKE FIGMA TUTORIALS
+============================================================
+Subject: Idea for your Figma workflow videos — prototype to shareable video
+
+Hi [CREATOR NAME],
+
+Your [SPECIFIC VIDEO TITLE] video is one I've actually sent to teammates —
+[ONE SENTENCE ON WHAT WAS GOOD / WHAT YOU LEARNED]. Your audience is exactly
+the kind of designer I built this for.
+
+I make ProtoVid, a free Figma plugin that turns connected prototypes into clean
+videos (MP4/WebM/GIF) without screen recording. A couple of angles that tend to
+land well with a Figma audience:
+
+- "Stop screen-recording your prototypes" — clean export vs. a jittery capture
+- Sharing prototypes with clients as a video + timestamped review link
+- Turning a prototype into a portfolio GIF
+
+No ask for a paid placement — if it's useful to your viewers I'd love for you to
+try it and cover it honestly. Happy to give you a free Studio code so you can
+show HD/4K exports, and to answer anything on camera.
+
+Plugin: https://www.figma.com/community/plugin/1606994616321079154
+
+Cheers,
+[YOUR NAME]
+
+
+============================================================
+3) REPLY TEMPLATE — "How do you share prototypes with clients?"
+   (Reddit r/FigmaDesign, r/UI_Design, Twitter/X threads)
+============================================================
+Read the thread first. Only post if a video genuinely answers their question.
+Lead with the advice, mention the tool once, never spam the link in multiple
+replies.
+
+---
+Sharing the raw Figma link usually backfires — clients click the wrong frame,
+get lost, and you end up on a call walking them through navigation.
+
+What's worked for me: send a video instead. They just press play. A screen
+recording works in a pinch, but it picks up your cursor and notifications and
+compresses badly.
+
+I use a plugin called ProtoVid that exports the connected frames straight to an
+MP4/GIF (no recording) and gives you a review link where the client can leave
+timestamped comments without a Figma account. Free tier is enough to try it.
+
+[Optional, only if asked for the link:]
+https://www.figma.com/community/plugin/1606994616321079154
+---
+
+
+NOTES
+-----
+• One personalized reference per email is the difference between a reply and
+  the trash. If you can't find one, don't send it to that person.
+• Follow up ONCE after ~5 business days, max. "Bumping this in case it got
+  buried — totally fine to pass." Then stop.
+• For creators, a free Studio grant is the cheapest conversion lever you have;
+  offer it up front.

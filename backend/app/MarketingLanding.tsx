@@ -10,14 +10,14 @@ export default function MarketingLanding() {
     '@id': `${siteUrl}/#software`,
     name: 'ProtoVid',
     alternateName: 'ProtoVid — Figma Prototype to Product Demo Video',
-    description: 'Self-serve Figma plugin for agencies and product teams to export connected prototype flows, invite unlimited reviewers, collect timestamped feedback, and record approval.',
+    description: 'Self-serve Figma plugin for turning connected or unlinked frames into client-ready walkthrough videos, with optional browser-based review links.',
     applicationCategory: 'DesignApplication',
     applicationSubCategory: 'Figma Plugin',
     operatingSystem: 'Figma',
     url: siteUrl,
     downloadUrl: 'https://www.figma.com/community/plugin/1606994616321079154',
     installUrl: 'https://www.figma.com/community/plugin/1606994616321079154',
-    softwareVersion: '1.3.21',
+    softwareVersion: '1.3.26',
     image: `${siteUrl}/logo128x128.png`,
     screenshot: `${siteUrl}/logo128x128.png`,
     publisher: { '@id': `${siteUrl}/#organization` },
@@ -35,7 +35,7 @@ export default function MarketingLanding() {
         name: 'Project Pass',
         price: String(LARGE_FLOW_PASS.amountCents / 100),
         priceCurrency: 'USD',
-        description: `${LARGE_FLOW_PASS.accessDays} days of unlimited 1080p and 4K exports, review rooms, approval links, and no watermark, no subscription`,
+        description: `${LARGE_FLOW_PASS.accessDays} days of unlimited 1080p and 4K client-ready walkthrough exports with no watermark and no subscription`,
       },
       {
         '@type': 'Offer',
@@ -43,7 +43,7 @@ export default function MarketingLanding() {
         price: String(STUDIO_MONTHLY.amountCents / 100),
         priceCurrency: 'USD',
         billingIncrement: 'Month',
-        description: `One creator account, unlimited reviewers, 30-day approval rooms, and unlimited HD/4K exports for ${monthlyPriceLabel}`,
+        description: `One creator account, unlimited HD/4K walkthrough exports, and review links that stay live for a full year for ${monthlyPriceLabel}`,
       },
     ],
     featureList: [
@@ -52,9 +52,9 @@ export default function MarketingLanding() {
       '720p Free output',
       '1080p and 4K Project Pass and Studio output',
       'Watermark removal with Project Pass or Studio',
-      'Shareable review rooms with timestamped feedback and approval',
-      'On-platform review briefs without a separate AI account',
-      'Launch-ready approval packages for client and stakeholder signoff',
+      'One-click connection for unlinked frames',
+      'Shareable browser review links with timestamped feedback',
+      'Client delivery for design revisions and launch walkthroughs',
     ],
   };
 
@@ -72,7 +72,7 @@ export default function MarketingLanding() {
     '@id': `${siteUrl}/#website`,
     url: siteUrl,
     name: 'ProtoVid',
-    description: 'Turn Figma prototypes into product demo videos, review rooms, and approval links.',
+    description: 'Turn Figma frames into client-ready walkthrough videos without screen recording.',
     publisher: { '@id': `${siteUrl}/#organization` },
     inLanguage: 'en-US',
   };
@@ -80,14 +80,14 @@ export default function MarketingLanding() {
   const howTo = {
     '@type': 'HowTo',
     '@id': `${siteUrl}/#howto`,
-    name: 'How to turn a Figma prototype into an approval-ready demo package',
-    description: 'Export a connected Figma prototype flow as an MP4, WebM, or GIF demo package with a review room in three steps with ProtoVid.',
+    name: 'How to turn Figma frames into a client-ready walkthrough video',
+    description: 'Export connected or unlinked Figma frames as an MP4, WebM, or GIF walkthrough in three steps with ProtoVid.',
     totalTime: 'PT2M',
     tool: [{ '@type': 'HowToTool', name: 'Figma' }, { '@type': 'HowToTool', name: 'ProtoVid plugin' }],
     step: [
-      { '@type': 'HowToStep', position: 1, name: 'Detect', text: 'ProtoVid finds the connected prototype flow on your Figma page and shows the frames in order.' },
+      { '@type': 'HowToStep', position: 1, name: 'Choose frames', text: 'ProtoVid finds a connected prototype flow or connects unlinked frames left to right on the current Figma page.' },
       { '@type': 'HowToStep', position: 2, name: 'Configure', text: 'Review the flow, choose MP4, WebM, or GIF, then select 720p Free or 1080p / 4K paid quality.' },
-      { '@type': 'HowToStep', position: 3, name: 'Share', text: 'Create the demo export, then download it or share a review brief, timestamped feedback room, and approval link.' },
+      { '@type': 'HowToStep', position: 3, name: 'Deliver', text: 'Download the demo video or send a browser review link for timestamped feedback when needed.' },
     ],
   };
 
@@ -96,9 +96,9 @@ export default function MarketingLanding() {
     '@id': `${siteUrl}/#faq`,
     mainEntity: [
       { '@type': 'Question', name: 'Do I need to screen record a Figma prototype?', acceptedAnswer: { '@type': 'Answer', text: 'No. ProtoVid captures connected prototype frames and produces MP4, WebM, or GIF walkthrough exports directly from the plugin — no screen recording or editing timeline.' } },
-      { '@type': 'Question', name: 'How is ProtoVid different from Figma Motion video export?', acceptedAnswer: { '@type': 'Answer', text: 'Figma Motion exports an animated top-level frame. ProtoVid exports a connected multi-screen prototype path as a client walkthrough video for delivery, demos, and reviews.' } },
+      { '@type': 'Question', name: 'How is ProtoVid different from Figma Motion video export?', acceptedAnswer: { '@type': 'Answer', text: 'Figma Motion exports an animated top-level frame. ProtoVid turns connected or unlinked multi-screen Figma frames into a client walkthrough video for delivery, demos, and reviews.' } },
       { '@type': 'Question', name: 'Can I try ProtoVid before paying?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. The Free plan includes 1 watermarked 720p export each month so you can validate the workflow before upgrading.' } },
-      { '@type': 'Question', name: 'When do I need paid access?', acceptedAnswer: { '@type': 'Answer', text: `Use Project Pass (${LARGE_FLOW_PASS.label}, ${LARGE_FLOW_PASS.accessDays} days) for one deadline. Use Studio (${monthlyPriceLabel}) for recurring client and stakeholder review with unlimited external reviewers.` } },
+      { '@type': 'Question', name: 'When do I need paid access?', acceptedAnswer: { '@type': 'Answer', text: `Use Project Pass (${LARGE_FLOW_PASS.label}, ${LARGE_FLOW_PASS.accessDays} days) for one deadline. Use Studio (${monthlyPriceLabel}) when delivered work needs to stay live: review links and their comments stay available for a full year instead of 30 days, with unlimited external reviewers.` } },
       { '@type': 'Question', name: 'Can I share a review of the demo?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. After exporting you can create a browser-based review link with a generated decision brief, timestamped comments, and approval or change-request status.' } },
       { '@type': 'Question', name: 'Do I need a separate AI account?', acceptedAnswer: { '@type': 'Answer', text: 'No. ProtoVid generates review context on-platform from export metadata and review-room activity, without a separate AI account or external model.' } },
       { '@type': 'Question', name: 'What formats and resolutions does ProtoVid export?', acceptedAnswer: { '@type': 'Answer', text: 'ProtoVid exports MP4, WebM, and GIF. Free exports are 720p with a watermark; Project Pass and Studio unlock 1080p and 4K with no watermark.' } },
@@ -135,21 +135,21 @@ export default function MarketingLanding() {
         <section className="hero">
           <div className="container">
             <div className="hero-badge">Figma Community plugin <span>— Free to start</span></div>
-            <h1>Export your Figma prototype<br /><em>for client delivery.</em></h1>
-            <p className="subtitle">Turn your Figma flow into a client-ready MP4, WebM, or GIF. Update the design and export the revision with saved settings. Start with a free watermarked proof, then finish your deadline with seven days of unlimited exports.</p>
+            <h1>Turn Figma frames into<br /><em>client-ready walkthroughs.</em></h1>
+            <p className="subtitle">No prototype wiring? ProtoVid connects your frames left to right, then exports an MP4, WebM, or GIF for client delivery. Start with a free watermarked proof and export polished revisions when your deadline calls for it.</p>
             <div className="hero-buttons">
               <a href="/api/referrals/figma?source=marketing_landing" className="btn btn-primary btn-large">Install from Figma Community</a>
               <a href="/guides/first-export" className="btn btn-secondary btn-large">Try a guided example</a>
             </div>
             <div className="hero-image">
-              <div className="demo-window" role="img" aria-label="A connected Figma prototype flow becoming a product demo video">
-                <div className="demo-window-top"><span>Connected prototype flow → demo video</span><span className="demo-status">Flow detected</span></div>
+              <div className="demo-window" role="img" aria-label="Figma frames becoming a client-ready walkthrough video">
+                <div className="demo-window-top"><span>Figma frames → client walkthrough</span><span className="demo-status">Ready to export</span></div>
                 <div className="demo-flow">
                   <div className="demo-frame"><strong>Home</strong><span></span><span></span><i className="demo-arrow">→</i></div>
                   <div className="demo-frame"><strong>Checkout</strong><span></span><span></span><i className="demo-arrow">→</i></div>
                   <div className="demo-frame"><strong>Success</strong><span></span><span></span></div>
                 </div>
-                <div className="demo-output"><span className="demo-play">▶</span><div className="demo-output-copy"><strong>approval-ready product demo</strong><small>3 connected frames · MP4/WebM/GIF · approval link optional</small></div><span className="demo-badge">Ready</span></div>
+                <div className="demo-output"><span className="demo-play">▶</span><div className="demo-output-copy"><strong>client-ready walkthrough</strong><small>3 frames · MP4/WebM/GIF · review link optional</small></div><span className="demo-badge">Ready</span></div>
               </div>
             </div>
           </div>
@@ -160,8 +160,8 @@ export default function MarketingLanding() {
           <div className="container">
             <div className="stats">
               <div className="stat">
-                <span className="number">Brief</span>
-                <span className="label">Product demo context</span>
+                <span className="number">1 click</span>
+                <span className="label">Connect unlinked frames</span>
               </div>
               <div className="stat">
                 <span className="number">720p</span>
@@ -172,8 +172,8 @@ export default function MarketingLanding() {
                 <span className="label">Studio — no watermark</span>
               </div>
               <div className="stat">
-                <span className="number">Approval</span>
-                <span className="label">Optional review status</span>
+                <span className="number">Review</span>
+                <span className="label">Optional browser feedback link</span>
               </div>
             </div>
           </div>
@@ -184,14 +184,14 @@ export default function MarketingLanding() {
           <div className="container">
             <div className="section-header">
               <span className="section-label">Features</span>
-              <h2 className="section-title">From connected flow to approval-ready asset</h2>
-              <p className="section-subtitle">ProtoVid follows the prototype path you already built in Figma, then packages the demo, feedback, and approval state in one shareable delivery link.</p>
+              <h2 className="section-title">From Figma frames to a video your client can watch</h2>
+              <p className="section-subtitle">ProtoVid handles the last mile between your Figma canvas and a clean walkthrough for a client update, product demo, launch, or portfolio case study.</p>
             </div>
             <div className="feature-grid">
               <div className="feature-card">
                 <div className="feature-icon">🔍</div>
-                <h3>Automatically detect the flow</h3>
-                <p>ProtoVid finds connected prototype frames on the current Figma page and shows the detected order before you export.</p>
+                <h3>Start with the frames you have</h3>
+                <p>ProtoVid follows connected prototype frames or connects unlinked frames left to right on the current page before you export.</p>
               </div>
               <div className="feature-card">
                 <div className="feature-icon">🎬</div>
@@ -200,18 +200,18 @@ export default function MarketingLanding() {
               </div>
               <div className="feature-card">
                 <div className="feature-icon">⚡</div>
-                <h3>Share one approval room</h3>
-                <p>When you need feedback, send a browser link with a local decision brief, walkthrough script, timestamped comments, and approval state.</p>
+                <h3>Send a clear review link</h3>
+                <p>When feedback matters, send one browser link with the walkthrough, timestamped comments, and an approval or changes-needed decision.</p>
               </div>
               <div className="feature-card">
                 <div className="feature-icon">📐</div>
-                <h3>Client-ready paid output</h3>
-                <p>Paid access unlocks 1080p and 4K exports without the ProtoVid watermark, plus review rooms for stakeholder delivery.</p>
+                <h3>Finish the polished version</h3>
+                <p>Paid access unlocks clean 1080p and 4K video without the ProtoVid watermark for the version you send outside Figma.</p>
               </div>
               <div className="feature-card">
                 <div className="feature-icon">🔄</div>
-                <h3>Track delivery signal</h3>
-                <p>Private owner links show view count, flow size, review type, comments, and approval status for each walkthrough.</p>
+                <h3>Make revisions without starting over</h3>
+                <p>Saved export settings make it fast to create the next walkthrough after you update the design.</p>
               </div>
               <div className="feature-card">
                 <div className="feature-icon">🚀</div>
@@ -228,7 +228,7 @@ export default function MarketingLanding() {
             <div className="section-header">
               <span className="section-label">Made for where demos go</span>
               <h2 className="section-title">Move prototype decisions forward</h2>
-              <p className="section-subtitle">Give every reviewer a clear artifact, a timestamped place to respond, and an explicit approval state without provisioning another paid seat.</p>
+              <p className="section-subtitle">Give people outside your Figma file a clean artifact to watch, comment on, and decide from without asking them to learn your design tool.</p>
             </div>
             <div className="use-case-grid">
               <div className="use-case">Agency client approval</div>
@@ -247,14 +247,14 @@ export default function MarketingLanding() {
             <div className="how-grid">
               <div>
                 <span className="section-label">How it works</span>
-              <h2 className="section-title">Three steps from prototype to demo video</h2>
-              <p className="section-subtitle">Turn a connected Figma prototype into a downloadable product demo and optional review room with a simple export path.</p>
+              <h2 className="section-title">Three steps from Figma canvas to client walkthrough</h2>
+              <p className="section-subtitle">Use the connections you already built, or start with unlinked frames, then create a downloadable video in a simple export path.</p>
                 <div className="steps">
                   <div className="step">
                     <div className="step-num">1</div>
                     <div className="step-text">
-                      <h4>Detect</h4>
-                      <p>ProtoVid finds the connected prototype flow and shows the frames in order.</p>
+                      <h4>Choose frames</h4>
+                      <p>ProtoVid finds the connected flow or connects unlinked frames left to right on the current page.</p>
                     </div>
                   </div>
                   <div className="step">
@@ -267,17 +267,17 @@ export default function MarketingLanding() {
                   <div className="step">
                     <div className="step-num">3</div>
                     <div className="step-text">
-                      <h4>Share</h4>
-                      <p>Create the demo export, then share a review brief, timestamped feedback room, and approval link when the project needs it.</p>
+                      <h4>Deliver</h4>
+                      <p>Download the walkthrough, or send a browser review link for timestamped feedback when the project needs it.</p>
                     </div>
                   </div>
                 </div>
               </div>
               <div className="how-image">
-                <div className="demo-steps" role="img" aria-label="Three steps: connect frames, export a product demo video, share the review room">
-                  <div className="demo-step"><span className="demo-step-number">1</span><div><strong>Detect the connected flow</strong><span>ProtoVid reads the path you defined in Figma's Prototype panel.</span></div></div>
+                <div className="demo-steps" role="img" aria-label="Three steps: choose Figma frames, export a walkthrough video, send an optional review link">
+                  <div className="demo-step"><span className="demo-step-number">1</span><div><strong>Choose the frames</strong><span>ProtoVid follows your Figma prototype path or connects the frames left to right.</span></div></div>
                   <div className="demo-step"><span className="demo-step-number">2</span><div><strong>Choose output quality</strong><span>Review the frames, then select 720p Free or 1080p / 4K Studio.</span></div></div>
-                  <div className="demo-step"><span className="demo-step-number">3</span><div><strong>Use the finished asset</strong><span>Download the demo, or share the generated brief, comments, and approval state in handoff.</span></div></div>
+                  <div className="demo-step"><span className="demo-step-number">3</span><div><strong>Send the finished walkthrough</strong><span>Download the video or share a browser review link when feedback is needed.</span></div></div>
                 </div>
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function MarketingLanding() {
               </div>
               <div className="privacy-card">
                 <h3>Review links expire</h3>
-                <p>Creating a review link stores the MP4, generated review brief, and review metadata server-side. Free links are available for 7 days; paid links for 30 days. Expired links are no longer served.</p>
+                <p>Creating a review link stores the MP4, generated review brief, and review metadata server-side. Free links are available for 7 days, Project Pass links for 30 days, and Studio links for a full year. Expired links are no longer served.</p>
               </div>
             </div>
             <p className="privacy-note">Review briefs are generated from export metadata inside ProtoVid and do not require a separate AI account or external model. Expired review videos, comments, and owner links are physically deleted by a daily retention cleanup.</p>
@@ -315,14 +315,14 @@ export default function MarketingLanding() {
           <div className="container">
             <div className="section-header">
               <span className="section-label">Questions</span>
-              <h2 className="section-title">Designed for the moment a prototype needs approval</h2>
-              <p className="section-subtitle">A simple export path for launch assets, client delivery, signoff, and repeat design iteration.</p>
+              <h2 className="section-title">Designed for the moment a Figma file needs to travel</h2>
+              <p className="section-subtitle">A simple export path for client delivery, product demos, launch assets, and portfolio walkthroughs.</p>
             </div>
             <div className="faq-grid">
               <div className="faq-item"><h3>Do I need to screen record?</h3><p>No. ProtoVid captures connected prototype frames and produces MP4, WebM, or GIF walkthrough exports directly from the plugin.</p></div>
               <div className="faq-item"><h3>How is this different from Figma Motion?</h3><p>Figma Motion exports an animated top-level frame. ProtoVid follows Prototype connections across multiple screens and turns that path into a client walkthrough video.</p></div>
               <div className="faq-item"><h3>Can I try it before paying?</h3><p>Yes. The Free plan includes 1 watermarked 720p export each month so you can validate the workflow.</p></div>
-              <div className="faq-item"><h3>When do I need paid access?</h3><p>Use Project Pass when one deadline needs HD/4K output, no watermark, and a 30-day approval room. Use Studio for recurring delivery with unlimited reviewers. Both start online without a sales call.</p></div>
+              <div className="faq-item"><h3>When do I need paid access?</h3><p>Use Project Pass when one deadline needs HD/4K output and no watermark. Use Studio to keep delivered work live — review links and comments stay available for a full year instead of 30 days. Both start online without a sales call.</p></div>
               <div className="faq-item"><h3>Can I share a review?</h3><p>Yes. After exporting, you can create a browser-based review link with a generated decision brief, timestamped comments, and approval or change-request status.</p></div>
               <div className="faq-item"><h3>Do I need a separate AI account?</h3><p>No. ProtoVid generates review context on-platform from export metadata and review-room activity.</p></div>
             </div>
@@ -334,8 +334,8 @@ export default function MarketingLanding() {
           <div className="container">
             <div className="section-header">
               <span className="section-label">Pricing</span>
-              <h2 className="section-title">Choose the approval workflow you need</h2>
-              <p className="section-subtitle">Start with a proof, pay once for a launch deadline, or subscribe for ongoing client, portfolio, and stakeholder signoff.</p>
+              <h2 className="section-title">Choose the delivery plan you need</h2>
+              <p className="section-subtitle">Start with a proof, pay once for a deadline, or subscribe for recurring client walkthroughs.</p>
             </div>
             <div className="pricing-grid">
               <div className="pricing-card">
@@ -364,7 +364,7 @@ export default function MarketingLanding() {
                   <li><span className="check">✓</span> 7 days of unlimited exports</li>
                   <li><span className="check">✓</span> 1080p and 4K output</li>
                   <li><span className="check">✓</span> No ProtoVid watermark</li>
-                  <li><span className="check">✓</span> Approval room and decision brief</li>
+                  <li><span className="check">✓</span> Browser review link when needed</li>
                   <li><span className="check">✓</span> No subscription</li>
                 </ul>
                 <a href="https://protovid.dasgroupllc.com/pricing?plan=project" className="btn btn-primary">Buy Project Pass</a>
@@ -380,7 +380,7 @@ export default function MarketingLanding() {
                   <li><span className="check">✓</span> Unlimited exports</li>
                   <li><span className="check">✓</span> One creator account</li>
                   <li><span className="check">✓</span> Unlimited external reviewers</li>
-                  <li><span className="check">✓</span> 30-day approval rooms and analytics</li>
+                  <li><span className="check">✓</span> Review links stay live for a full year</li>
                 </ul>
                 <a href="https://protovid.dasgroupllc.com/pricing" className="btn btn-secondary">Start Studio online</a>
               </div>
@@ -392,8 +392,8 @@ export default function MarketingLanding() {
         <section className="cta-section" id="install">
           <div className="container">
             <span className="section-label">Get started</span>
-            <h2 className="section-title">Ready to export your first approval-ready demo?</h2>
-            <p className="section-subtitle">Install ProtoVid from the Figma Community, connect your prototype flow, and create a clean demo video with optional review and approval context in minutes.</p>
+            <h2 className="section-title">Ready to create your first client walkthrough?</h2>
+            <p className="section-subtitle">Install ProtoVid from the Figma Community, choose your frames, and create a clean video for delivery in minutes.</p>
             <a href="/api/referrals/figma?source=marketing_landing" className="btn btn-primary btn-large">Install Figma Plugin</a>
             <p className="cta-hint">Or search "ProtoVid" in Figma's plugin library</p>
             <p className="cta-hint">Optional convenience: voice control is available after you explicitly choose to use it.</p>

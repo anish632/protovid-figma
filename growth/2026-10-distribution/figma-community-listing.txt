@@ -1,0 +1,41 @@
+PROTOVID — FIGMA COMMUNITY LISTING (paste-ready)
+=================================================
+Benefit-led, keyword-rich, scannable. Figma Community descriptions render as
+plain text with line breaks, so this uses short lines, emoji bullets, and the
+target keywords ("Figma prototype to video", "export to MP4/GIF", "record
+Figma prototype", "walkthrough video") in the first two lines where they get
+the most SEO weight. Paste the block below the divider.
+
+----------------------------------------------------------------------
+
+Turn Figma prototypes into shareable videos — no screen recording.
+
+ProtoVid exports your connected Figma frames to a clean MP4, WebM, or GIF walkthrough. No cursor in frame, no notifications, no compression mess — just the prototype, rendered straight from your design.
+
+▶ WHAT YOU CAN DO
+• Export any connected Figma prototype to video (MP4, WebM, or GIF)
+• Auto-detect the prototype path and sequence frames in order
+• Choose 720p, 1080p, or 4K output
+• Share a review link — clients watch and leave timestamped, frame-level comments without opening Figma
+• Skip the screen recorder entirely
+
+✓ PERFECT FOR
+• Client delivery — send a video, not a Figma link they have to learn
+• Design reviews — collect precise, timestamped feedback
+• Portfolio pieces — show the real flow, not static screenshots
+• Stakeholder presentations — drop a clean walkthrough into any deck
+
+⚡ WHY PROTOVID INSTEAD OF SCREEN RECORDING
+Screen recordings catch your cursor, random pop-ups, and inconsistent quality. ProtoVid renders the video from your frames, so every export is clean and repeatable. Re-export in seconds after a design change — no re-recording.
+
+💬 BUILT FOR SHARING
+Create a review link in one click. Reviewers press play and comment on the exact moment something needs attention — no Figma account, no account setup.
+
+💸 PRICING
+• Free — 1 watermarked 720p export per month
+• Project Pass — $4 for 7 days of unlimited HD/4K exports, no watermark, no subscription
+• Studio — $5/mo for unlimited exports, HD & 4K, no watermark, 30-day review rooms
+
+Install free, pick your frames, and share your first walkthrough in minutes.
+
+Keywords: figma prototype to video, export figma to mp4, figma to video plugin, record figma prototype, figma prototype walkthrough video, figma to gif, figma prototype to webm, design review video.

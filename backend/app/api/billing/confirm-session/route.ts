@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     await setSubscription(email, getCheckoutSubscriptionUpdate(session));
 
-    return NextResponse.json({ confirmed: true });
+    return NextResponse.json({ confirmed: true, email });
   } catch (error) {
     console.error('Checkout confirmation error:', error);
     const status = error instanceof Error && error.name === 'ZodError' ? 400 : 500;
