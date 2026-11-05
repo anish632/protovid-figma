@@ -3,7 +3,7 @@ import { emailSchema } from '@/lib/validation';
 import { recordEvent } from '@/lib/events';
 import { cleanupExpiredShares, createShare, MAX_SHARE_BYTES, normalizeShareExperimentVariant } from '@/lib/shareStorage';
 import { getSubscription } from '@/lib/storage';
-import { isPremiumSubscription } from '@/lib/plans';
+import { getBillingAccessType, type BillingAccessType } from '@/lib/billingAccess';
 import { createReviewRoom } from '@/lib/reviewStorage';
 import { mediaRateLimit } from '@/lib/rateLimit';
 
@@ -62,11 +62,14 @@ export async function POST(request: NextRequest) {
       ...(anonymousId ? { anonymousId } : {}),
     }).catch(error => console.warn('Share request analytics failed:', error));
 
-    let paid = false;
+    let accessKind: BillingAccessType = 'none';
     if (email) {
       const subscription = await getSubscription(email);
-      paid = isPremiumSubscription(subscription);
+      accessKind = getBillingAccessType(subscription);
     }
+    // A subscriber's delivered work stays live for a year; a one-time Pass keeps
+    // the 30-day window. `paid` remains for analytics and the response shape.
+    const paid = accessKind !== 'none';
 
     await cleanupExpiredShares().catch(error => console.warn('Expired share cleanup failed:', error));
 
@@ -80,6 +83,7 @@ export async function POST(request: NextRequest) {
       startFrameName,
       endFrameName,
       estimatedDurationSeconds: Number.isFinite(estimatedDurationSeconds) ? estimatedDurationSeconds : null,
+      accessKind,
       paid,
       experimentVariant,
     });
@@ -92,6 +96,7 @@ export async function POST(request: NextRequest) {
       frame_count: share.frameCount,
       file_size_bytes: body.byteLength,
       paid,
+      access_kind: accessKind,
       expires_at: share.expiresAt,
       ...(share.experimentVariant ? { experiment_variant: share.experimentVariant } : {}),
       ...(anonymousId ? { anonymousId } : {}),

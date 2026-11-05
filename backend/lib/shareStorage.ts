@@ -5,8 +5,36 @@ import { ensureReviewTables } from './reviewStorage';
 
 export const MAX_SHARE_BYTES = 4_000_000;
 export const FREE_SHARE_TTL_DAYS = 7;
+// A one-time Project Pass keeps the long-standing 30-day retention window.
 export const PAID_SHARE_TTL_DAYS = 30;
+// A recurring subscription is the only tier whose delivered work stays live
+// well beyond the export itself. Persistence — not the export, which is bursty
+// and already served by the Pass — is what the subscription uniquely sells, so
+// subscriber links live a full year rather than expiring after a month.
+export const SUBSCRIPTION_SHARE_TTL_DAYS = 365;
 export type ShareExperimentVariant = 'control' | 'invite_panel';
+
+/**
+ * Which paid entitlement produced a share. Mirrors BillingAccessType in
+ * billingAccess.ts; duplicated as a plain union here to keep shareStorage free
+ * of a billing-module import.
+ */
+export type ShareAccessKind = 'subscription' | 'one_time_access' | 'none';
+
+/**
+ * Link lifespan by entitlement. Kept pure (no clock, no I/O) so the retention
+ * promise each tier makes is unit-testable without a database.
+ */
+export function resolveShareTtlDays(accessKind: ShareAccessKind): number {
+  switch (accessKind) {
+    case 'subscription':
+      return SUBSCRIPTION_SHARE_TTL_DAYS;
+    case 'one_time_access':
+      return PAID_SHARE_TTL_DAYS;
+    default:
+      return FREE_SHARE_TTL_DAYS;
+  }
+}
 
 export interface ShareRecord {
   id: string;
@@ -161,6 +189,10 @@ export async function createShare(input: {
   startFrameName?: string | null;
   endFrameName?: string | null;
   estimatedDurationSeconds?: number | null;
+  // `accessKind` is the durable signal: a subscription keeps links live for a
+  // year, a one-time Pass for 30 days. `paid` stays accepted for callers that
+  // only know "paid vs not" and maps to the Pass window.
+  accessKind?: ShareAccessKind;
   paid?: boolean;
   experimentVariant?: ShareExperimentVariant | null;
 }): Promise<ShareRecord> {
@@ -170,7 +202,9 @@ export async function createShare(input: {
   await ensureShareTable();
   const sql = getDB();
   const id = createShareId();
-  const ttlDays = input.paid ? PAID_SHARE_TTL_DAYS : FREE_SHARE_TTL_DAYS;
+  const accessKind: ShareAccessKind =
+    input.accessKind ?? (input.paid ? 'one_time_access' : 'none');
+  const ttlDays = resolveShareTtlDays(accessKind);
   const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
   const email = input.email?.toLowerCase().trim() || null;
   const filename = normalizeFilename(input.filename);

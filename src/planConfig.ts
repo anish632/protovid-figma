@@ -16,7 +16,7 @@ export const PRO_PLAN = {
   exports: 'unlimited',
   resolution: 'HD & 4K',
   watermark: false,
-  features: ['Unlimited exports', 'HD & 4K resolution', 'No watermark', 'Unlimited reviewers', '30-day review rooms']
+  features: ['Your review links stay live for a full year', 'Review rooms keep collecting client comments', 'Unlimited HD & 4K exports, no watermark', 'Unlimited reviewers', 'Re-export anytime after a design change']
 } as const;
 
 export const LARGE_FLOW_PASS = {
@@ -42,8 +42,8 @@ export const FREE_RESOLUTION = '720p';
 export const PRO_RESOLUTIONS = ['1080p', '4K'] as const;
 
 export const PRO_UPGRADE_COPY = {
-  upsellHeadline: 'Make this client-ready',
-  upsellBody: 'Remove the watermark, unlock HD/4K, and ship the version you would put in front of a client.',
+  upsellHeadline: 'Keep your work live for clients',
+  upsellBody: 'Studio keeps every review link and its comments live for a full year — not 30 days — so delivered work keeps working while you iterate. Plus HD/4K and no watermark.',
   upsellCta: `Start Studio`,
   upsellSubtext: `Just ${PRO_PLAN.priceDisplay}. Manage billing securely in Stripe.`,
   limitHeadline: 'You’ve hit the free limit',
@@ -64,6 +64,6 @@ export const PRO_UPGRADE_COPY = {
     noWatermark: 'Clean, professional videos',
     clientReady: 'Perfect for stakeholder decisions',
     unlimitedReviewers: 'Invite clients and stakeholders without paid seats',
-    reviewRooms: 'Keep paid review rooms active for 30 days'
+    reviewRooms: 'Review links and comments stay live for a full year'
   }
 } as const;
